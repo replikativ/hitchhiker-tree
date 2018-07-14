@@ -3,7 +3,7 @@
   (:require [clojure.core.rrb-vector :refer [catvec vec]]
             [#?(:clj clojure.test :cljs cljs.test)
              #?(:clj :refer :cljs :refer-macros) [deftest testing run-tests is
-                                                  #?(:cljs async)]]
+                                                 #?(:cljs async)]]
             [clojure.test.check.clojure-test #?(:clj :refer :cljs :refer-macros) [defspec]]
             [clojure.test.check.generators :as gen #?@(:cljs [:include-macros true])]
             [clojure.test.check.properties :as prop #?@(:cljs [:include-macros true])]
@@ -17,8 +17,9 @@
             [hitchhiker.tree.async :refer [*async-backend*]]
             [hitchhiker.ops :refer [recorded-ops]]
             #?(:cljs [cljs.core.async :refer [promise-chan] :as async]
-               :clj [clojure.core.async :refer [promise-chan] :as async])
-            #?(:cljs [cljs.nodejs :as nodejs])))
+              :clj [clojure.core.async :refer [promise-chan] :as async])
+            #?(:cljs [cljs.nodejs :as nodejs])
+            [clojure.string :as str]))
 
 #?(:cljs
    (do
@@ -29,12 +30,16 @@
 (defn iter-helper [tree key]
   (case *async-backend*
     :none
-    (msg/forward-iterator (core/lookup-path tree key))
+    (if-let [path (core/lookup-path tree key)]
+      (msg/forward-iterator path)
+      [])
     :core.async
     (go-try
      (let [iter-ch (async/chan)
            path (<? (core/lookup-path tree key))]
-       (msg/forward-iterator iter-ch path key)
+       (when path
+         (msg/forward-iterator iter-ch path key))
+       (async/close! iter-ch)
        (<? (async/into [] iter-ch))))))
 
 
@@ -133,7 +138,7 @@
                                         :del [(<? (msg/delete t x-reduced)) root (disj set x-reduced)]))))
                               [(<? (core/b-tree (core/->Config 3 3 2))) nil #{}]
                               ops))]
-        (let [b-tree-order (map first (<? (iter-helper b-tree -1)))
+        (let [b-tree-order (seq (map first (<? (iter-helper b-tree -1))))
               res (= b-tree-order (seq (sort set)))]
           (assert res (str "These are unequal: " (pr-str b-tree-order) " " (pr-str (seq (sort set)))))
           #?(:clj (delete-store folder))
@@ -170,8 +175,6 @@
    (defspec test-many-keys-bigger-trees
      1000
      (mixed-op-seq 800 200 10 1000 1000)))
-
-
 
 
 (comment
