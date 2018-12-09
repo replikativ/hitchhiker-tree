@@ -190,6 +190,7 @@ throwable error."
         (symbol? t) 5
         (keyword? t) 6))
 
+
 (extend-protocol IKeyCompare
   ;; By default, we use the default comparator
   #?@(:clj
@@ -202,7 +203,9 @@ throwable error."
                     (clojure.core/compare key1 key2)
                     (catch ClassCastException e
                       (- (order-on-edn-types key2)
-                         (order-on-edn-types key1))))))
+                         (order-on-edn-types key1))))
+                  (- (order-on-edn-types key2)
+                     (order-on-edn-types key1))))
        String
        (compare [^String key1 key2]
                 (if (instance? String key2)
