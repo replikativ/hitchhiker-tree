@@ -1,0 +1,31 @@
+{:aliases
+ {:test
+  {:extra-paths ["test"],
+   :extra-deps {org.clojure/test.check {:mvn/version "0.9.0"}}},
+  :runner
+  {:extra-deps
+   {com.cognitect/test-runner
+    {:git/url "https://github.com/cognitect-labs/test-runner",
+     :sha "76568540e7f40268ad2b646110f237a60295fa3c"}},
+   :main-opts ["-m" "cognitect.test-runner" "-d" "test"]},
+  :run {:jvm-opts ["-server" "-Xmx3700m" "-Xms3700m"]},
+  :profiling
+  {:main-opts ["-m" "hitchhiker.bench"],
+   :extra-deps
+   {criterium {:mvn/version "0.4.4"},
+    org.clojure/tools.cli {:mvn/version "0.3.3"},
+    org.clojure/test.check {:mvn/version "0.9.0"},
+    com.infolace/excel-templates {:mvn/version "0.3.3"}}},
+  :dev
+  {:extra-deps
+   {org.clojure/test.check {:mvn/version "0.9.0"},
+    aysylu/loom {:mvn/version "1.0.1"},
+    cheshire {:mvn/version "5.8.0"}}}},
+ :deps
+ {org.clojure/clojure {:mvn/version "1.9.0"},
+  org.clojure/clojurescript {:mvn/version "1.8.51"},
+  org.clojure/core.memoize {:mvn/version "0.5.8"},
+  com.taoensso/carmine {:mvn/version "2.12.2"},
+  org.clojure/core.rrb-vector {:mvn/version "0.0.11"},
+  org.clojure/core.cache {:mvn/version "0.6.5"},
+  io.replikativ/konserve {:mvn/version "0.5.0-beta3"}}}
