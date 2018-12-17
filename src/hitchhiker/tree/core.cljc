@@ -14,7 +14,7 @@
                    [java.util Arrays Collections]))
   #?(:cljs (:require-macros [cljs.core.async.macros :refer [go]]
                             [hitchhiker.tree.core :refer [go-try <? <?resolve]]))
-  #?(:clj (:import [clojure.lang.PersistentTreeMap$BlackVal])))
+  #?(:clj (:import clojure.lang.PersistentTreeMap$BlackVal)))
 
 
 ;; cljs macro environment
