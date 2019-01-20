@@ -7,19 +7,21 @@
             [clojure.test.check.clojure-test #?(:clj :refer :cljs :refer-macros) [defspec]]
             [clojure.test.check.generators :as gen #?@(:cljs [:include-macros true])]
             [clojure.test.check.properties :as prop #?@(:cljs [:include-macros true])]
-            #?(:clj [konserve.filestore :refer [new-fs-store delete-store list-keys]])
+            [konserve.filestore :refer [new-fs-store delete-store list-keys]]
             [konserve.memory :refer [new-mem-store]]
             [hitchhiker.konserve :as kons]
             [konserve.cache :as kc]
+            [hasch.core :as hasch]
             [hitchhiker.tree.core #?(:clj :refer :cljs :refer-macros)
              [<?? <? go-try] :as core]
             [hitchhiker.tree.messaging :as msg]
-            [hitchhiker.tree.async :refer [*async-backend*]]
+            #?(:clj [hitchhiker.tree.async :refer [case-async]])
             [hitchhiker.ops :refer [recorded-ops]]
             #?(:cljs [cljs.core.async :refer [promise-chan] :as async]
               :clj [clojure.core.async :refer [promise-chan] :as async])
             #?(:cljs [cljs.nodejs :as nodejs])
-            [clojure.string :as str]))
+            [clojure.string :as str])
+  #?(:cljs (:require-macros [hitchhiker.tree.async :refer [case-async]])))
 
 #?(:cljs
    (do
@@ -28,7 +30,7 @@
 
 
 (defn iter-helper [tree key]
-  (case *async-backend*
+  (case-async
     :none
     (if-let [path (core/lookup-path tree key)]
       (msg/forward-iterator path)
@@ -39,8 +41,8 @@
            path (<? (core/lookup-path tree key))]
        (when path
          (msg/forward-iterator iter-ch path key))
-       (async/close! iter-ch)
        (<? (async/into [] iter-ch))))))
+
 
 
 (deftest simple-konserve-test
@@ -48,7 +50,12 @@
     #?(:cljs
        (async done
         (go-try
-         (let [store (kc/ensure-cache (async/<!! (new-mem-store))) ;; always use core.async here!
+         (let [folder "/tmp/async-hitchhiker-tree-test"
+               _ (delete-store folder)
+               store (kons/add-hitchhiker-tree-handlers
+                      (kc/ensure-cache (async/<!
+                                        (new-mem-store)
+                                        #_(new-fs-store folder)))) ;; always use core.async here!
                backend (kons/->KonserveBackend store)
                init-tree (<? (core/reduce< (fn [t i] (msg/insert t i i))
                                            (<? (core/b-tree (core/->Config 1 3 (- 3 1))))
@@ -68,11 +75,13 @@
              (is (= (<? (msg/lookup tree 2)) 2))
              (is (= (<? (msg/lookup tree 3)) nil))
              (is (= (<? (msg/lookup tree 4)) 4)))
+           (delete-store folder)
            (done)))))
     #?(:clj
        (let [folder "/tmp/async-hitchhiker-tree-test"
              _ (delete-store folder)
-             store (kons/add-hitchhiker-tree-handlers (kc/ensure-cache (async/<!! (new-fs-store folder :config {:fsync false}))))
+             store (kons/add-hitchhiker-tree-handlers
+                    (kc/ensure-cache (async/<!! (new-fs-store folder :config {:fsync false}))))
              backend (kons/->KonserveBackend store)
              flushed (<?? (core/flush-tree
                            (time (reduce (fn [t i]
@@ -97,52 +106,41 @@
          (delete-store folder)))))
 
 
-
 ;; adapted from redis tests
 
 (defn insert
   [t k]
   (msg/insert t k k))
 
-(comment
-  (def recorded-ops (atom []))
-
-  (binding [*print-length* -1]
-    (spit "/tmp/ops" (pr-str (vec (take 100 @recorded-ops)))))
-
-  (count @recorded-ops)
-
-  (first @recorded-ops))
 
 (defn ops-test [ops universe-size]
   (go-try
-      (let [folder "/tmp/konserve-mixed-workload"
-            _ #?(:clj (delete-store folder) :cljs nil)
-            store (kons/add-hitchhiker-tree-handlers
-                   (kc/ensure-cache
-                    #?(:clj (async/<!! (new-fs-store folder :config {:fsync false}))
-                      :cljs (async/<! (new-mem-store)))))
-            _ #?(:clj (assert (empty? (async/<!! (list-keys store)))
-                              "Start with no keys")
-                 :cljs nil)
-            ;_ (swap! recorded-ops conj ops)
-            [b-tree root set]
-            (<? (core/reduce< (fn [[t root set] [op x]]
-                                (go-try
-                                    (let [x-reduced (when x (mod x universe-size))]
-                                      (condp = op
-                                        :flush (let [flushed (<? (core/flush-tree t (kons/->KonserveBackend store)))
-                                                     t (:tree flushed)]
-                                                 [t (<? (:storage-addr t)) set])
-                                        :add [(<? (insert t x-reduced)) root (conj set x-reduced)]
-                                        :del [(<? (msg/delete t x-reduced)) root (disj set x-reduced)]))))
-                              [(<? (core/b-tree (core/->Config 3 3 2))) nil #{}]
-                              ops))]
-        (let [b-tree-order (seq (map first (<? (iter-helper b-tree -1))))
-              res (= b-tree-order (seq (sort set)))]
-          (assert res (str "These are unequal: " (pr-str b-tree-order) " " (pr-str (seq (sort set)))))
-          #?(:clj (delete-store folder))
-          res))))
+   (let [folder (str "/tmp/konserve-mixed-workload" (hasch/uuid))
+         _ #?(:clj (delete-store folder) :cljs nil)
+         store (kons/add-hitchhiker-tree-handlers
+                (kc/ensure-cache
+                 #?(:clj (async/<!! (new-fs-store folder :config {:fsync false}))
+                   :cljs (async/<! (new-mem-store)))))
+         _ #?(:clj (assert (empty? (async/<!! (list-keys store)))
+                          "Start with no keys")
+             :cljs nil)
+                                        ;_ (swap! recorded-ops conj ops)
+         [b-tree root set]
+         (<? (core/reduce< (fn [[t root set] [op x]]
+                             (go-try
+                              (let [x-reduced (when x (mod x universe-size))]
+                                (condp = op
+                                  :flush (let [flushed (<? (core/flush-tree t (kons/->KonserveBackend store)))
+                                               t (:tree flushed)]
+                                           [t (<? (:storage-addr t)) set])
+                                  :add [(<? (insert t x-reduced)) root (conj set x-reduced)]
+                                  :del [(<? (msg/delete t x-reduced)) root (disj set x-reduced)]))))
+                           [(<? (core/b-tree (core/->Config 3 3 2))) nil #{}]
+                           ops))]
+     (let [b-tree-order (seq (map first (<? (iter-helper b-tree -1))))
+           res (= b-tree-order (seq (sort set)))]
+       (assert res (str "These are unequal: " (pr-str b-tree-order) " " (pr-str (seq (sort set)))))
+       res))))
 
 ;; TODO recheck when https://dev.clojure.org/jira/browse/TCHECK-128 is fixed
 ;; and share clj mixed-op-seq test, remove ops.cljc then.
@@ -173,30 +171,9 @@
 
 #?(:clj
    (defspec test-many-keys-bigger-trees
-     1000
+     100
      (mixed-op-seq 800 200 10 1000 1000)))
 
-
-(comment
-  ;; macroexpanded
-  (defn test-many-keys-bigger-trees
-  ([]
-   (let [options__29789__auto__ (clojure.test.check.clojure-test/process-options 100)]
-     (apply test-many-keys-bigger-trees
-            (:num-tests options__29789__auto__)
-            (apply concat options__29789__auto__))))
-  ([times & {:as quick-check-opts, :keys [seed max-size]}]
-   (go-try
-       (apply clojure.test.check/quick-check
-              times
-              (vary-meta (<? (mixed-op-seq 800 200 10 1000 1000))
-                         assoc :name (str (quote (mixed-op-seq 800 200 10 1000 1000))))
-              (apply concat quick-check-opts)))))
-
-  (<?? (test-many-keys-bigger-trees))
-  (macroexpand-1 '(defspec test-many-keys-bigger-trees
-                    100
-                    (mixed-op-seq 800 200 10 1000 1000))))
 
 #?(:cljs
    (defn ^:export test-all [cb]
@@ -206,3 +183,7 @@
          (println "Success!")
          (println "FAIL")))
      (run-tests)))
+
+
+
+

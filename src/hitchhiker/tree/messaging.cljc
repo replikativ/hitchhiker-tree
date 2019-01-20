@@ -1,15 +1,17 @@
 (ns hitchhiker.tree.messaging
   (:refer-clojure :exclude [subvec])
-  (:require [clojure.core.rrb-vector :refer [catvec]]
+  (:require [hitchhiker.tree.async]
+            [clojure.core.rrb-vector :refer [catvec]]
             [hasch.core :refer [uuid]]
             #?(:clj [clojure.core.async :as async]
                :cljs [cljs.core.async :as async])
             #?(:clj [clojure.pprint :as pp])
             #?(:clj [hitchhiker.tree.core :refer [go-try <? <??] :as core]
               :cljs [hitchhiker.tree.core :as core])
-            [hitchhiker.tree.async :refer [*async-backend*]])
+            #?(:clj [hitchhiker.tree.async :refer [case-async]]))
   #?(:clj (:import java.io.Writer))
-  #?(:cljs (:require-macros [hitchhiker.tree.core :refer [go-try <? <?resolve]])))
+  #?(:cljs (:require-macros [hitchhiker.tree.core :refer [go-try <? <?resolve]]
+                           [hitchhiker.tree.async :refer [case-async]])))
 
 ;; An operation is an object with a few functions
 ;; 1. It has a function that it applies to the tree to apply its effect
@@ -77,7 +79,6 @@
    (go-try
      (let [deferred-ops (atom [])
            msg-buffers-propagated (<? (enqueue tree msgs deferred-ops))]
-                                        ;(when (seq @deferred-ops) (println "appyling deferred ops" @deferred-ops))
        (loop [tree msg-buffers-propagated
               [op & r] @deferred-ops]
          (if op
@@ -97,9 +98,6 @@
              (update-in [:op-buf] into msgs))
          :else ; overflow, should be IndexNode
          (do (assert (core/index-node? tree))
-                                        ;(println "overflowing node" (:keys tree) "with buf" (:op-buf tree)
-                                        ;         "with new msgs" msgs
-                                        ;         )
              (loop [[child & children] (:children tree)
                     rebuilt-children []
                     msgs (vec (sort-by affects-key ;must be a stable sort
@@ -115,9 +113,6 @@
                                                           (affects-key %)
                                                           (core/last-key child))))
                                       msgs)
-                                        ;_ (println "last-key:" (core/last-key child))
-                                        ;_ (println "goes left:" took-msgs)
-                                        ;_ (println "goes right:" extra-msgs)
                      on-the-last-child? (empty? children)
 
                      ;; Any changes to the current child?
@@ -211,9 +206,6 @@
           ;;We include op if leq my left, and not if leq left's left
           ;;TODO we can't apply all ops, we should ensure to only apply ops whose keys are in the defined range, unless we're the last sibling
           ]
-      ;(println "left-sibs-min-last" left-sibs-min-last)
-      ;(println "is-last?" is-last?)
-      ;(println "expanding data node" data-node "with ops" correct-ops)
       (reduce (fn [coll op]
                 (apply-op-to-coll op coll))
               (:children data-node)
@@ -237,11 +229,10 @@
 (defn delete
   [tree key]
   (enqueue tree [(assoc (->DeleteOp key)
-                        :tag (uuid)
-                        )]))
+                        :tag (uuid))]))
 
 
-(case *async-backend*
+(case-async
   :none
   (do
     (defn forward-iterator
@@ -292,24 +283,6 @@
          (let [path (<?? (core/lookup-path tree key))
                iter-ch (async/chan)]
            (forward-iterator iter-ch path key)
-           (core/chan-seq iter-ch)))))
+           (core/chan-seq iter-ch))))))
 
 
-
-  )
-
-
-(defn slice [tree start-key end-key]
-  (let [res (transient [])]
-    (loop [path (<?? (core/lookup-path tree start-key))]
-      (if path
-        (let  [_ (assert (core/data-node? (peek path)))
-               elements (apply-ops-in-path path)
-               #_(drop-while (fn [[k v]]
-                               (neg? (core/compare k start-key)))
-                                    )]
-          (doseq [e elements]
-            (conj! res e))
-          #_(<? (async/onto-chan iter-ch elements false))
-          (recur (<? (core/right-successor (pop path)))))))
-    (persistent! res)))

@@ -97,8 +97,8 @@
 (def flushed (<?? (core/flush-tree
                    (time (reduce (fn [t i]
                                    (<?? (msg/insert t i i)))
-                                 (<?? (core/b-tree (core/->Config 3 3 3)))
-                                 (shuffle (range 1 25))))
+                                 (<?? (core/b-tree (core/->Config 3 3 2)))
+                                 (shuffle (range 1 30))))
                    (kons/->KonserveBackend store))))
 
 
@@ -106,9 +106,42 @@
                    (time (reduce (fn [t i]
                                    (<?? (msg/insert t i i)))
                                  (:tree flushed)
-                                 (shuffle (range 25 50))))
+                                 (shuffle (range -4 -2))))
                    (kons/->KonserveBackend store))))
 
+
+
+(comment
+  ;; TODO double root node?
+
+  (do
+    (def store (kons/add-hitchhiker-tree-handlers
+                (kc/ensure-cache (async/<!! (new-mem-store)))) )
+
+
+    ;; insertion
+    (def flushed (<?? (core/flush-tree
+                       (time (reduce (fn [t i]
+                                       (<?? (msg/insert t i i)))
+                                     (<?? (core/b-tree (core/->Config 2 2 2)))
+                                     (concat (range 1 12)
+                                             #_[0 13 14 -1 15])))
+                       (kons/->KonserveBackend store))))
+
+
+    (def flushed (<?? (core/flush-tree
+                       (time (reduce (fn [t i]
+                                       (<?? (msg/insert t i i)))
+                                     (:tree flushed)
+                                     (range 12 14)))
+                       (kons/->KonserveBackend store))))
+
+    (view (create-graph store))
+
+    )
+
+
+  )
 
 
 (defn init-graph [store]

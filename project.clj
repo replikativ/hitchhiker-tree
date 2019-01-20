@@ -1,17 +1,15 @@
-(defproject io.replikativ/hitchhiker-tree "0.1.2"
+(defproject io.replikativ/hitchhiker-tree "0.1.3"
   :description "A Hitchhiker Tree Library"
   :url "https://github.com/dgrnbrg/hitchhiker-tree"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.9.0"]
-                 [org.clojure/clojurescript "1.8.51" :scope "provided"]
-                 [org.clojure/core.memoize "0.5.8"]
+  :dependencies [[org.clojure/clojure "1.10.0"]
+                 [org.clojure/clojurescript "1.10.439" :scope "provided"]
+                 [org.clojure/core.memoize "0.7.1"]
                  [com.taoensso/carmine "2.12.2"]
-                 [org.clojure/core.rrb-vector "0.0.11"]
-                 [org.clojure/core.cache "0.6.5"]
-
-                 [io.replikativ/konserve "0.5.0-beta3"]
-                 ]
+                 [org.clojure/core.rrb-vector "0.0.13"]
+                 [org.clojure/core.cache "0.7.2"]
+                 [io.replikativ/konserve "0.5.0"]]
   :aliases {"bench" ["with-profile" "profiling" "run" "-m" "hitchhiker.bench"]}
   :jvm-opts ["-server" "-Xmx3700m" "-Xms3700m"]
   :profiles {:test
@@ -20,22 +18,20 @@
              {:main hitchhiker.bench
               :source-paths ["env/profiling"]
               :dependencies [[criterium "0.4.4"]
-                             [org.clojure/tools.cli "0.3.3"]
+                             [org.clojure/tools.cli "0.4.1"]
                              [org.clojure/test.check "0.9.0"]
                              [com.infolace/excel-templates "0.3.3"]]}
-             :dev {:dependencies [#_[binaryage/devtools "0.8.2"]
-                                  #_[figwheel-sidecar "0.5.8"]
-                                  #_[com.cemerick/piggieback "0.2.1"]
+             :dev {:dependencies [[binaryage/devtools "0.9.10"]
+                                  [figwheel-sidecar "0.5.18"]
                                   [org.clojure/test.check "0.9.0"]
                                   ;; plotting
-                                  [aysylu/loom "1.0.1"]
-                                  [cheshire "5.8.0"]]
+                                  [aysylu/loom "1.0.2"]
+                                  [cheshire "5.8.1"]]
                    :source-paths ["src" "dev"]
-                   ;:plugins [[lein-figwheel "0.5.8"]]
+                   :plugins [[lein-figwheel "0.5.18"]]
                    :repl-options {; for nREPL dev you really need to limit output
-                                  :init (set! *print-length* 50)
-                                  #_:nrepl-middleware #_[cemerick.piggieback/wrap-cljs-repl]}}}
-  :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"]
+                                  :init (set! *print-length* 50)}}}
+  :clean-targets ^{:protect false} ["resources/public/js" "target"]
 
 
   :cljsbuild {:builds
@@ -48,17 +44,15 @@
                            :output-dir "resources/public/js/out" }}
                ;; inspired by datascript project.clj
                {:id "test"
-                :source-paths ["src" "test" "dev"]
+                :source-paths ["src" "test"]
                 :compiler {
-                           :main          hitchhiker-tree.konserve-test
+                           :main          hitchhiker.konserve-test
                            :output-to     "target/test.js"
                            :output-dir    "target/none"
                            :optimizations :none
                            :source-map    true
                            :recompile-dependents false
-                           :parallel-build true
-                           }}
-               ]}
+                           :parallel-build true}}]}
 
-  :plugins [[lein-figwheel "0.5.8"]
-            [lein-cljsbuild "1.1.4" :exclusions [[org.clojure/clojure]]]])
+  :plugins [[lein-figwheel "0.5.18"]
+            [lein-cljsbuild "1.1.7" :exclusions [[org.clojure/clojure]]]])

@@ -141,8 +141,8 @@ See the `doc/` folder for technical details of the hitchhiker tree and Redis gar
 ### Async support
 
 We have preliminary async support that has to be selected before macro expansion
-time by setting `hitchhiker.tree.async/*async-backend*` either to `none` or
-`core.async`.
+time by setting `hitchhiker.tree.async/*async-backend*` either to `:none` or
+`:core.async`.
 
 ## Gratitude
 

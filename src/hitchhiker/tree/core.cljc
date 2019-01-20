@@ -1,24 +1,24 @@
 (ns hitchhiker.tree.core
   (:refer-clojure :exclude [compare resolve subvec])
-  (:require [clojure.core.rrb-vector :refer [catvec subvec]]
+  (:require [hitchhiker.tree.async]
+            [clojure.core.rrb-vector :refer [catvec subvec]]
             #?(:clj [clojure.pprint :as pp])
-            #?(:clj [clojure.core.async :refer [promise-chan poll! put!]])
-            #?(:clj [clojure.core.async :refer [go chan put! <! <!! promise-chan]
+            #?(:clj [clojure.core.async :refer [promise-chan poll! put! go chan put! <! <!! promise-chan]
                      :as async]
-               :cljs [cljs.core.async :refer [chan put! <! promise-chan]
+              :cljs [cljs.core.async :refer [promise-chan poll! put! chan put! <! promise-chan]
                       :as async])
             #?(:cljs [goog.array])
             #?(:clj [taoensso.nippy :as nippy])
-            [hitchhiker.tree.async :refer [*async-backend*]])
+            #?(:clj [hitchhiker.tree.async :refer [case-async]]))
   #?(:clj (:import java.io.Writer
                    [java.util Arrays Collections]))
   #?(:cljs (:require-macros [cljs.core.async.macros :refer [go]]
-                            [hitchhiker.tree.core :refer [go-try <? <?resolve]]))
+                           [hitchhiker.tree.core :refer [go-try <? <?resolve]]
+                           [hitchhiker.tree.async :refer [case-async]]))
   #?(:clj (:import clojure.lang.PersistentTreeMap$BlackVal)))
 
 
-;; cljs macro environment
-
+;; check cljs macro environment
 (defn- cljs-env?
   "Take the &env from a macro, and tell whether we are expanding into cljs."
   [env]
@@ -53,35 +53,36 @@
   this exception and deal with it! This means you need to take the
   result from the channel at some point."
      {:style/indent 1}
-     [ & body]
-     (case *async-backend*
-       :none
-       `(if-cljs (throw (ex-info "You need an async backend for cljs." {}))
-                 (do ~@body))
-       :core.async
-       `(if-cljs (cljs.core.async.macros/go
+     [& body]
+     `(case-async
+        :none
+        (if-cljs (throw (ex-info "You need an async backend for cljs." {}))
+          (do ~@body))
+        :core.async
+        (if-cljs (cljs.core.async.macros/go
                    (try ~@body
                         (catch js/Error e#
                           e#)))
-               (go
-                 (try
-                   ~@body
-                   (catch Exception e#
-                     e#)))))))
+          (go
+            (try
+              ~@body
+              (catch Exception e#
+                e#)))))))
+
+
 
 #?(:clj
    (defmacro <?
      "Same as core.async <! but throws an exception if the channel returns a
 throwable error."
      [ch]
-     (case *async-backend*
-       :none
-       `(if-cljs (throw (ex-info "You need an async backend for cljs." {}))
-                 ~ch)
-       :core.async
-       `(if-cljs (throw-if-exception (cljs.core.async/<! ~ch))
-                 (throw-if-exception (<! ~ch)))
-       )))
+     `(case-async
+        :none
+        (if-cljs (throw (ex-info "You need an async backend for cljs." {}))
+          ~ch)
+        :core.async
+        (if-cljs (throw-if-exception (cljs.core.async/<! ~ch))
+          (throw-if-exception (<! ~ch))))))
 
 
 #?(:clj
@@ -89,7 +90,7 @@ throwable error."
      "Same as core.async <!! but throws an exception if the channel returns a
 throwable error."
      [ch]
-     (case *async-backend*
+     (case-async
        :none ch
 
        :core.async
@@ -188,7 +189,13 @@ throwable error."
         (number? t) 3
         (string? t) 4
         (symbol? t) 5
-        (keyword? t) 6))
+        (keyword? t) 6
+        ;; TODO use boolean? when datahike is on 1.9+
+        (or (true? t) (false? t)) 7
+
+        (nil? t) 10000
+        :else (throw (ex-info (str "Type not supported:" (type t))
+                              {:value t}))))
 
 
 (extend-protocol IKeyCompare
@@ -276,7 +283,7 @@ throwable error."
   IResolve
   (index? [this] true)
   (dirty? [this] (not (poll! storage-addr)))
-  (resolve [this] this #_(go this))
+  (resolve [this] (go-try this))
   (last-key [this]
     ;;TODO should optimize by caching to reduce IOps (can use monad)
     (last-key (peek children)))
@@ -394,7 +401,7 @@ throwable error."
 (defrecord DataNode [children storage-addr cfg]
   IResolve
   (index? [this] false)
-  (resolve [this] this #_(go this)) 
+  (resolve [this] this)
   (dirty? [this] (not (poll! storage-addr)))
   (last-key [this]
     (when (seq children)
@@ -582,7 +589,7 @@ throwable error."
 
 ;; this is only for the REPL and testing
 
-(case *async-backend*
+(case-async
   :none
   (do
     (defn forward-iterator
@@ -744,7 +751,7 @@ throwable error."
   IResolve
   (dirty? [this] false)
   (last-key [_] last-key)
-  (resolve [_] node #_(go node)))
+  (resolve [_] (go-try node)))
 
 #?(:clj
    (defn print-testing-addr
@@ -822,7 +829,6 @@ throwable error."
      (if (dirty? tree)
        (let [cleaned-children (if (data-node? tree)
                                 (:children tree)
-                                ;; TODO throw on nested errors
                                 (->> (flush-children (:children tree) backend stats)
                                      <?
                                      catvec))
