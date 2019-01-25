@@ -404,9 +404,17 @@ throwable error."
          (pp/write-out (:children node)))))))
 
 (defn nth-of-set
-  "Like nth, but for sorted sets. O(n)"
+  "Like nth, but for sorted sets. O(n) in worst case, 0(1) when idx out
+  of bounds."
   [set index]
-  (first (drop index set)))
+  ;; we can escape early for free since sorted-sets are ICounted
+  (when (> (count set) index)
+    (loop [i 0
+           set set]
+      (if (< i index)
+        (recur (unchecked-inc i)
+               (next set))
+        (first set)))))
 
 (defrecord DataNode [children storage-addr cfg]
   IResolve
