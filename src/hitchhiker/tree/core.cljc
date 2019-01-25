@@ -291,6 +291,13 @@ throwable error."
   [children]
   (mapv last-key (butlast children)))
 
+(defn nth-index-node-keys
+  "Returns key at index from (index-node-keys children)"
+  [children idx]
+  (nth (eduction (map last-key)
+                 children)
+       idx))
+
 (declare ->IndexNode)
 
 (defrecord IndexNode [children storage-addr op-buf cfg]
