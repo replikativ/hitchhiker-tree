@@ -557,8 +557,6 @@ throwable error."
           path
           (recur (pop tmp)))))))
 
-
-
 (defn right-successor
   "Given a node on a path, find's that node's right successor node"
   [path]
@@ -612,19 +610,19 @@ throwable error."
     (loop [path [tree] ;alternating node/index/node/index/node... of the search taken
            cur tree ;current search node
            ]
-      (if (seq (:children cur))
-        (if (data-node? cur)
-          path
-          (let [index (lookup cur key)
-                child (if (data-node? cur)
-                        nil #_(nth-of-set (:children cur) index)
-                        (-> (:children cur)
-                            ;;TODO what are the semantics for exceeding on the right? currently it's trunc to the last element
-                            (nth index (peek (:children cur)))
-                            (<?resolve)))
-                path' (conj path index child)]
-            (recur path' child)))
-        nil))))
+      (let [children (:children cur)]
+        (when (> (count children) 0)
+          (if (data-node? cur)
+            path
+            (let [index (lookup cur key)
+                  child (if (data-node? cur)
+                          nil #_(nth-of-set (:children cur) index)
+                          (-> children
+                              ;;TODO what are the semantics for exceeding on the right? currently it's trunc to the last element
+                              (nth index (peek children))
+                              (<?resolve)))
+                  path' (conj path index child)]
+              (recur path' child))))))))
 
 (defn lookup-key
   "Given a B-tree and a key, gets an iterator into the tree"
@@ -632,12 +630,11 @@ throwable error."
    (lookup-key tree key nil))
   ([tree key not-found]
    (go-try
-     (->
-      (-> (<? (lookup-path tree key))
-          (peek)
-          (<?resolve))
-      :children
-      (get key not-found)))))
+     (-> (<? (lookup-path tree key))
+         (peek)
+         (<?resolve)
+         :children
+         (get key not-found)))))
 
 ;; this is only for the REPL and testing
 
