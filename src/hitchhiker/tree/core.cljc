@@ -315,7 +315,8 @@ throwable error."
     (< (count children) (:index-b cfg)))
   (split-node [this]
     (let [b (:index-b cfg)
-          median (nth (index-node-keys children) (dec b))
+          median (nth-index-node-keys children
+                                      (dec b))
           [left-buf right-buf] (split-with #(not (pos? (compare (:key %) median)))
                                            ;;TODO this should use msg/affects-key
                                            (sort-by :key compare op-buf))]
