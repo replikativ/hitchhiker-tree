@@ -1,5 +1,5 @@
 (ns hitchhiker.tree.core
-  (:refer-clojure :exclude [compare resolve subvec])
+  (:refer-clojure :exclude [compare resolve subvec satisfies?])
   (:require [hitchhiker.tree.async]
             [clojure.core.rrb-vector :refer [catvec subvec]]
             #?(:clj [clojure.pprint :as pp])
@@ -107,7 +107,6 @@ throwable error."
        (recur (<? (go-f res f)) r)
        res))))
 
-
 ;; core code
 
 (defrecord Config [index-b data-b op-buf-size])
@@ -123,12 +122,6 @@ throwable error."
   (dirty? [_] "Returns true if this should be flushed")
   ;;TODO resolve should be instrumented
   (resolve [_] "Returns the INode version of this node in a go-block; could trigger IO"))
-
-
-
-(defn tree-node?
-  [node]
-  (satisfies? IResolve node))
 
 (defprotocol INode
   (overflow? [node] "Returns true if this node has too many elements")
@@ -362,10 +355,6 @@ throwable error."
                             op-buf (nippy/thaw-from-in! data-input)]
                         (->IndexNode children nil op-buf cfg))))
 
-(defn index-node?
-  [node]
-  (instance? IndexNode node))
-
 #?(:clj
    (defn print-index-node
      "Optionally include"
@@ -453,6 +442,33 @@ throwable error."
   "Creates a new data node"
   [cfg children]
   (->DataNode children (promise-chan) cfg))
+
+(def satisfies?
+  ;; FIXME for now `(satisfies? IResolve node)` is crippled,
+  ;; implementers have no cache see:
+  ;; https://dev.clojure.org/jira/browse/CLJ-1814.  So we just check
+  ;; types manually to get x2 speed from satisfies?
+
+  ;; check cache first, otherwise call satisfies? and cache result
+  (let [cache (atom {})]
+    (fn [proto node]
+      ;; check cache first, otherwise call satisfies? and cache result
+      (let [kls (class node)
+            k [proto kls]
+            cached-val (get @cache k ::not-found)]
+        (if (identical? cached-val ::not-found)
+          (let [ret (clojure.core/satisfies? proto node)]
+            (swap! cache assoc k ret)
+            ret)
+          cached-val)))))
+
+(defn tree-node?
+  [node]
+  (satisfies? IResolve node))
+
+(defn index-node?
+  [node]
+  (instance? IndexNode node))
 
 (defn data-node?
   [node]
@@ -570,9 +586,6 @@ throwable error."
         (-> (pop common-parent-path)
             (conj next-index)
             (into path-suffix))))))
-
-
-
 
 (defn lookup-path
   "Given a B-tree and a key, gets a path into the tree"
