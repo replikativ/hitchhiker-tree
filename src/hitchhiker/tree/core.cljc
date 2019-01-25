@@ -15,9 +15,9 @@
   #?(:cljs (:require-macros [cljs.core.async.macros :refer [go]]
                            [hitchhiker.tree.core :refer [go-try <? <?resolve]]
                            [hitchhiker.tree.async :refer [case-async]]))
-  #?(:clj (:import clojure.lang.PersistentTreeMap$BlackVal)))
-
-
+  #?(:clj (:import (clojure.lang PersistentTreeMap$BlackVal IPersistentVector
+                                 IPersistentSet IPersistentMap
+                                 Symbol Keyword))))
 ;; check cljs macro environment
 (defn- cljs-env?
   "Take the &env from a macro, and tell whether we are expanding into cljs."
@@ -182,21 +182,42 @@ throwable error."
 ;; our targets.
 
 ;; TODO add full edn support including records
-(defn order-on-edn-types [t]
-  (cond (map? t) 0
-        (vector? t) 1
-        (set? t) 2
-        (number? t) 3
-        (string? t) 4
-        (symbol? t) 5
-        (keyword? t) 6
-        ;; TODO use boolean? when datahike is on 1.9+
-        (or (true? t) (false? t)) 7
 
-        (nil? t) 10000
-        :else (throw (ex-info (str "Type not supported:" (type t))
-                              {:value t}))))
+(defprotocol OrderOnEDNTypes
+  (order-on-edn-types [t]))
 
+(extend-protocol OrderOnEDNTypes
+  IPersistentMap
+  (order-on-edn-types [_] 0)
+
+  IPersistentVector
+  (order-on-edn-types [_] 1)
+
+  IPersistentSet
+  (order-on-edn-types [_] 2)
+
+  Number
+  (order-on-edn-types [_] 3)
+
+  String
+  (order-on-edn-types [_] 4)
+
+  Symbol
+  (order-on-edn-types [_] 5)
+
+  Keyword
+  (order-on-edn-types [_] 6)
+
+  Boolean
+  (order-on-edn-types [_] 7)
+
+  nil
+  (order-on-edn-types [_] 10000)
+
+  Object
+  (order-on-edn-types [t]
+    (throw (ex-info (str "Type not supported:" (type t))
+                    {:value t}))))
 
 (extend-protocol IKeyCompare
   ;; By default, we use the default comparator
