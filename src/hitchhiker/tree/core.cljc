@@ -289,7 +289,9 @@ throwable error."
 (defn index-node-keys
   "Calculates the separating keys given the children of an index node"
   [children]
-  (mapv last-key (pop children)))
+  (into []
+        (map last-key)
+        (pop children)))
 
 (declare ->IndexNode)
 
