@@ -289,14 +289,7 @@ throwable error."
 (defn index-node-keys
   "Calculates the separating keys given the children of an index node"
   [children]
-  (mapv last-key (butlast children)))
-
-(defn nth-index-node-keys
-  "Returns key at index from (index-node-keys children)"
-  [children idx]
-  (nth (eduction (map last-key)
-                 children)
-       idx))
+  (mapv last-key (pop children)))
 
 (declare ->IndexNode)
 
@@ -315,8 +308,7 @@ throwable error."
     (< (count children) (:index-b cfg)))
   (split-node [this]
     (let [b (:index-b cfg)
-          median (nth-index-node-keys children
-                                      (dec b))
+          median (nth (index-node-keys children) (dec b))
           [left-buf right-buf] (split-with #(not (pos? (compare (:key %) median)))
                                            ;;TODO this should use msg/affects-key
                                            (sort-by :key compare op-buf))]
