@@ -716,8 +716,8 @@ throwable error."
                            (dirty!))
                        (pop (pop path))))
               (recur (-> parent
-                         ;;TODO this assoc-in seems to be a bottleneck
-                         (assoc-in [:children index] node)
+                         ;;TODO this assoc seems to be a bottleneck
+                         (assoc :children (assoc (:children parent) index node))
                          (dirty!))
                      (pop (pop path))))))))))
 
