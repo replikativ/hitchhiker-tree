@@ -167,8 +167,9 @@
                    (rseq) ; highest node should be last in seq
                    (apply catvec)
                    (sort-by affects-key core/compare)) ;must be a stable sort
-          this-node-index (-> path pop peek)
-          parent (-> path pop pop peek)
+          init-path (pop path)
+          this-node-index (peek init-path)
+          parent (-> init-path pop peek)
           is-first? (zero? this-node-index)
           ;;We'll need to find the smallest last-key of the left siblings along the path
           [left-sibs-on-path is-last?]
@@ -177,13 +178,14 @@
                  left-sibs (transient [])]
             (if (= 1 (count path)) ; are we at the root?
               [(persistent! left-sibs) is-last?]
-              (let [this-node-index (-> path pop peek)
-                    parent (-> path pop pop peek)
+              (let [init-path (pop path)
+                    this-node-index (peek init-path)
+                    parent (-> init-path pop peek)
                     is-first? (zero? this-node-index)
                     local-last? (= (-> parent :children count dec)
                                    this-node-index)]
                 (if is-first?
-                  (recur (pop (pop path))
+                  (recur (pop init-path)
                          (and is-last? local-last?)
                          (if is-first?
                            left-sibs

@@ -712,7 +712,8 @@ throwable error."
               (->IndexNode [left right] (promise-chan) [] cfg))
             node)
           (let [index (peek path)
-                {:keys [children keys] :as parent} (peek (pop path))]
+                init-path (pop path)
+                {:keys [children keys] :as parent} (peek init-path)]
             (if (overflow? node) ; splice the split into the parent
               ;;TODO refactor paths to be node/index pairs or 2 vectors or something
               (let [{:keys [left right median]} (split-node node)
@@ -722,12 +723,12 @@ throwable error."
                 (recur (-> parent
                            (assoc :children new-children)
                            (dirty!))
-                       (pop (pop path))))
+                       (pop init-path)))
               (recur (-> parent
                          ;;TODO this assoc seems to be a bottleneck
                          (assoc :children (assoc (:children parent) index node))
                          (dirty!))
-                     (pop (pop path))))))))))
+                     (pop init-path)))))))))
 
 ;;TODO: cool optimization: when merging children, push as many operations as you can
 ;;into them to opportunistically minimize overall IO costs
@@ -746,7 +747,8 @@ throwable error."
             (first (:children node))
             node)
           (let [index (peek path)
-                {:keys [children keys op-buf] :as parent} (peek (pop path))]
+                init-path (pop path)
+                {:keys [children keys op-buf] :as parent} (peek init-path)]
             (if (underflow? node) ; splice the split into the parent
               ;;TODO this needs to use a polymorphic sibling-count to work on serialized nodes
               (let [bigger-sibling-idx
@@ -770,18 +772,18 @@ throwable error."
                                         (promise-chan)
                                         op-buf
                                         cfg)
-                           (pop (pop path))))
+                           (pop init-path)))
                   (recur (->IndexNode (catvec (conj old-left-children merged)
                                               old-right-children)
                                       (promise-chan)
                                       op-buf
                                       cfg)
-                         (pop (pop path)))))
+                         (pop init-path))))
               (recur (->IndexNode (assoc children index node)
                                   (promise-chan)
                                   op-buf
                                   cfg)
-                     (pop (pop path))))))))))
+                     (pop init-path)))))))))
 
 (defn b-tree
   [cfg & kvs]
