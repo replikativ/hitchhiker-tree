@@ -99,7 +99,7 @@
          :else ; overflow, should be IndexNode
          (do (assert (core/index-node? tree))
              (loop [[child & children] (:children tree)
-                    rebuilt-children []
+                    rebuilt-children (transient [])
                     msgs (vec (sort-by affects-key ;must be a stable sort
                                        core/compare
                                        (concat (:op-buf tree) msgs)))]
@@ -131,10 +131,12 @@
 
                  (if on-the-last-child?
                    (-> tree
-                       (assoc :children (conj rebuilt-children new-child))
+                       (assoc :children (-> rebuilt-children
+                                            (conj! new-child)
+                                            persistent!))
                        (assoc :op-buf [])
                        (core/dirty!))
-                   (recur children (conj rebuilt-children new-child) extra-msgs))))))))))
+                   (recur children (conj! rebuilt-children new-child) extra-msgs))))))))))
 
 
 ;;TODO delete in core needs to stop using the index-node constructor to be more
@@ -155,7 +157,6 @@
                 elem))
             e r)))
 
-
 (defn apply-ops-in-path
   [path]
   (if (>= 1 (count path))
@@ -173,21 +174,22 @@
           [left-sibs-on-path is-last?]
           (loop [path path
                  is-last? true
-                 left-sibs []]
+                 left-sibs (transient [])]
             (if (= 1 (count path)) ; are we at the root?
-              [left-sibs is-last?]
+              [(persistent! left-sibs) is-last?]
               (let [this-node-index (-> path pop peek)
                     parent (-> path pop pop peek)
                     is-first? (zero? this-node-index)
                     local-last? (= (-> parent :children count dec)
                                    this-node-index)]
                 (if is-first?
-                  (recur (pop (pop path)) (and is-last? local-last?) left-sibs)
                   (recur (pop (pop path))
                          (and is-last? local-last?)
-                         (conj left-sibs
-                               (nth (:children parent)
-                                    (dec this-node-index))))))))
+                         (if is-first?
+                           left-sibs
+                           (conj! left-sibs
+                                  (nth (:children parent)
+                                       (dec this-node-index)))))))))
           left-sibs-min-last (when (seq left-sibs-on-path)
                                (->> left-sibs-on-path
                                     (map core/last-key)
@@ -284,5 +286,3 @@
                iter-ch (async/chan)]
            (forward-iterator iter-ch path key)
            (core/chan-seq iter-ch))))))
-
-

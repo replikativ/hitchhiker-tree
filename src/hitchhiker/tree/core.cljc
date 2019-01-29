@@ -543,7 +543,7 @@ throwable error."
    it was true, or else we return the empty path"
   [path pred]
   (loop [path path]
-    (when (seq path)
+    (when (pos? (count path))
       (let [from-index (peek path)
             tmp (pop path)
             parent (peek tmp)]
@@ -568,7 +568,7 @@ throwable error."
             new-sibling (<?resolve (nth (:children parent) next-index))
             ;; We must get back down to the data node
             ;; iterate cannot do blocking operations with core.async, so we use a loop
-            sibling-lineage (loop [res [new-sibling]
+            sibling-lineage (loop [res (transient [new-sibling])
                                     s new-sibling]
                               (let [c (-> s :children first)
                                     ;_ (prn (type c) (= (class c) clojure.lang.PersistentTreeMap$BlackVal))
@@ -580,15 +580,14 @@ throwable error."
                                             #?(:clj (= (class c) clojure.lang.PersistentTreeMap$Black))
                                             #?(:clj (= (class c) clojure.lang.PersistentTreeMap$BlackVal)))
                                         c
-
                                         (tree-node? c)
                                         (<?resolve c)
 
                                         :else c)]
                                 (if (or (index-node? c)
                                         (data-node? c))
-                                  (recur (conj res c) c)
-                                  res)))
+                                  (recur (conj! res c) c)
+                                  (persistent! res))))
             path-suffix (-> (interleave sibling-lineage
                                         (repeat 0))
                             (butlast)) ; butlast ensures we end w/ node
@@ -601,22 +600,24 @@ throwable error."
   "Given a B-tree and a key, gets a path into the tree"
   [tree key]
   (go-try
-    (loop [path [tree] ;alternating node/index/node/index/node... of the search taken
+    (loop [path (transient [tree]) ;alternating node/index/node/index/node... of the search taken
            cur tree ;current search node
            ]
       (let [children (:children cur)]
         (when (> (count children) 0)
           (if (data-node? cur)
-            path
+            (persistent! path)
             (let [index (lookup cur key)
                   child (if (data-node? cur)
                           nil #_(nth-of-set (:children cur) index)
                           (-> children
                               ;;TODO what are the semantics for exceeding on the right? currently it's trunc to the last element
                               (nth index (peek children))
-                              (<?resolve)))
-                  path' (conj path index child)]
-              (recur path' child))))))))
+                              (<?resolve)))]
+              (recur (-> path
+                         (conj! index)
+                         (conj! child))
+                     child))))))))
 
 (defn lookup-key
   "Given a B-tree and a key, gets an iterator into the tree"
@@ -835,10 +836,10 @@ throwable error."
   [children backend session]
   (go-try
       (loop [[c & r] children
-             res []]
+             res (transient [])]
         (if-not c
-          res
-          (recur r (conj res (<? (flush-tree c backend session))))))))
+          (persistent! res)
+          (recur r (conj! res (<? (flush-tree c backend session))))))))
 
 (defprotocol IBackend
   (new-session [backend] "Returns a session object that will collect stats")
@@ -892,10 +893,10 @@ throwable error."
   [children backend session]
   (go-try
    (loop [[c & r] children
-          res []]
+          res (transient [])]
      (if-not c
-       res
-       (recur r (conj res (<? (flush-tree-without-root c backend session false))))))))
+       (persistent! res)
+       (recur r (conj! res (<? (flush-tree-without-root c backend session false))))))))
 
 
 (defn flush-tree-without-root
