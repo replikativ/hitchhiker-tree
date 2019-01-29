@@ -438,10 +438,13 @@ throwable error."
   (underflow? [this]
     (< (count children) (:data-b cfg)))
   (split-node [this]
-    (let [m empty-sorted-map-by-compare
-          data-b (:data-b cfg)]
-      (->Split (data-node cfg (into m (take data-b) children))
-               (data-node cfg (into m (drop data-b) children))
+    (let [data-b (:data-b cfg)]
+      (->Split (data-node cfg (into empty-sorted-map-by-compare
+                                    (take data-b)
+                                    children))
+               (data-node cfg (into empty-sorted-map-by-compare
+                                    (drop data-b)
+                                    children))
                (nth-of-set children (dec data-b)))))
   (merge-node [this other]
     (data-node cfg (into children (:children other))))
