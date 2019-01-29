@@ -418,6 +418,8 @@ throwable error."
                (next set))
         (first set)))))
 
+(def empty-sorted-map-by-compare (sorted-map-by compare))
+
 (defrecord DataNode [children storage-addr cfg]
   IResolve
   (index? [this] false)
@@ -436,7 +438,7 @@ throwable error."
   (underflow? [this]
     (< (count children) (:data-b cfg)))
   (split-node [this]
-    (let [m (sorted-map-by compare)
+    (let [m empty-sorted-map-by-compare
           data-b (:data-b cfg)]
       (->Split (data-node cfg (into m (take data-b) children))
                (data-node cfg (into m (drop data-b) children))
@@ -697,7 +699,7 @@ throwable error."
   [{:keys [cfg] :as tree} key value]
   (go-try
     (let [path (<? (lookup-path tree key))
-          {:keys [children] :or {children (sorted-map-by compare)}} (peek path)
+          {:keys [children] :or {children empty-sorted-map-by-compare}} (peek path)
           updated-data-node (data-node cfg (assoc children key value))]
       (loop [node updated-data-node
              path (pop path)]
@@ -731,7 +733,7 @@ throwable error."
   [{:keys [cfg] :as tree} key]
   (go-try
     (let [path (<? (lookup-path tree key)) ; don't care about the found key or its index
-          {:keys [children] :or {children (sorted-map-by compare)}} (peek path)
+          {:keys [children] :or {children empty-sorted-map-by-compare}} (peek path)
           updated-data-node (data-node cfg (dissoc children key))]
       (loop [node updated-data-node
              path (pop path)]
@@ -782,7 +784,7 @@ throwable error."
   [cfg & kvs]
   (go-try
     (loop [[[k v] & r] (partition 2 kvs)
-           t (data-node cfg (sorted-map-by compare))]
+           t (data-node cfg empty-sorted-map-by-compare)]
       (if k
         (recur r (<? (insert t k v)))
         t)))
