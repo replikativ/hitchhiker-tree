@@ -16,7 +16,6 @@
              {:dependencies [[org.clojure/test.check "0.9.0"]]}
              :profiling
              {:main hitchhiker.bench
-              :jvm-opts ^:replace ["-server"]
               :source-paths ["env/profiling"]
               :dependencies [[criterium "0.4.4"]
                              [org.clojure/tools.cli "0.4.1"]
