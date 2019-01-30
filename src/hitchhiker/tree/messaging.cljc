@@ -184,14 +184,13 @@
                     is-first? (zero? this-node-index)
                     local-last? (= (-> parent :children count dec)
                                    this-node-index)]
-                (if is-first?
-                  (recur (pop init-path)
-                         (and is-last? local-last?)
-                         (if is-first?
-                           left-sibs
-                           (conj! left-sibs
-                                  (nth (:children parent)
-                                       (dec this-node-index)))))))))
+                (recur (pop init-path)
+                       (and is-last? local-last?)
+                       (if is-first?
+                         left-sibs
+                         (conj! left-sibs
+                                (nth (:children parent)
+                                     (dec this-node-index))))))))
           left-sibs-min-last (when (seq left-sibs-on-path)
                                (->> left-sibs-on-path
                                     (map core/last-key)
