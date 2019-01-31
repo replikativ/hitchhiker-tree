@@ -100,11 +100,11 @@
                              cfg))
           'hitchhiker.tree.core.IndexNode
           (fn [{:keys [children cfg op-buf]}]
-            (core/->IndexNode (->> children
-                                 vec)
-                              (promise-chan)
-                              (vec op-buf)
-                              cfg))
+            (core/index-node (->> children
+                                  vec)
+                             (promise-chan)
+                             (vec op-buf)
+                             cfg))
           'hitchhiker.tree.messaging.InsertOp
           msg/map->InsertOp
           'hitchhiker.tree.messaging.DeleteOp
@@ -125,9 +125,5 @@
             (-> node
                (assoc :storage-addr nil)
                (update-in [:children]
-                          (fn [cs] (map #(assoc % :store nil :storage-addr nil) cs)))))}) 
+                          (fn [cs] (map #(assoc % :store nil :storage-addr nil) cs)))))})
   store)
-
-
-
-

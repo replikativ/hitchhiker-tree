@@ -18,7 +18,7 @@
   (testing "Basic searches"
     (let [data1 (data-node (->Config 3 5 2) (sorted-map 1 1 2 2 3 3 4 4 5 5))
           data2 (data-node (->Config 3 5 2) (sorted-map 6 6 7 7 8 8 9 9 10 10))
-          root (->IndexNode [data1 data2] (promise-chan) [] (->Config 3 5 2))]
+          root (index-node [data1 data2] (promise-chan) [] (->Config 3 5 2))]
       (is (= (<?? (lookup-key root -10)) nil) "not found key")
       (is (= (<?? (lookup-key root 100)) nil) "not found key")
       (dotimes [i 10]
@@ -26,7 +26,7 @@
   (testing "Basic string key searches"
     (let [data1 (data-node (->Config 3 5 2) (sorted-map "1" 1 "10" 10 "2" 2 "3" 3 "4" 4))
           data2 (data-node (->Config 3 5 2) (sorted-map "5" 5 "6" 6 "7" 7 "8" 8 "9" 9))
-          root (->IndexNode [data1 data2] (promise-chan) [] (->Config 3 5 2))]
+          root (index-node [data1 data2] (promise-chan) [] (->Config 3 5 2))]
       (is (= (<?? (lookup-key root "-10")) nil) "not found key")
       (is (= (<?? (lookup-key root "100")) nil) "not found key")
       (dotimes [i 10]
@@ -34,12 +34,12 @@
   (testing "basic fwd iterator"
     (let [data1 (data-node (->Config 3 5 2) (sorted-map 1 1 2 2 3 3 4 4 5 5))
           data2 (data-node (->Config 3 5 2) (sorted-map 6 6 7 7 8 8 9 9 10 10))
-          root (->IndexNode [data1 data2] (promise-chan) [] (->Config 3 5 2))]
+          root (index-node [data1 data2] (promise-chan) [] (->Config 3 5 2))]
       (is (= (map first (lookup-fwd-iter root 4)) (range 4 11)))
       (is (= (map first (lookup-fwd-iter root 0)) (range 1 11)))))
   (testing "index nodes identified as such"
     (let [data (data-node (->Config 3 5 2) (sorted-map 1 1))
-          root (->IndexNode [data] (promise-chan) [] (->Config 3 5 2))]
+          root (index-node [data] (promise-chan) [] (->Config 3 5 2))]
       (is (index? root))
       (is (not (index? data))))))
 
@@ -91,14 +91,14 @@
 
 (deftest insert-test
   (let [data1 (data-node (->Config 3 3 2) (sorted-map 1 "1" 2 "2" 3 "3" 4 "4"))
-        root (->IndexNode [data1] (promise-chan) [] (->Config 3 3 2))]
+        root (index-node [data1] (promise-chan) [] (->Config 3 3 2))]
     (is (= (map second (lookup-fwd-iter (<?? (insert root 3 "3")) -10)) ["1" "2" "3" "4"]))
     (are [x] (= (map second (lookup-fwd-iter (<?? (insert root x (str x))) -10)) (sort (map str (conj [1 2 3 4] x))))
          0
          2.5
          5))
   (let [data1 (data-node (->Config 3 3 2) (sorted-map 1 1 2 2 3 3 4 4 5 5))
-        root (->IndexNode [data1] (promise-chan) [] (->Config 3 3 2))]
+        root (index-node [data1] (promise-chan) [] (->Config 3 3 2))]
     (are [x y] (= (map first (lookup-fwd-iter (<?? (insert root x x)) y))
                   (drop-while
                     #(< % y)
