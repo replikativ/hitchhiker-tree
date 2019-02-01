@@ -751,7 +751,7 @@ throwable error."
                       (pop init-path)))
              (recur (-> parent
                         ;;TODO this assoc seems to be a bottleneck
-                        (assoc :children (assoc (:children parent) index node))
+                        (assoc :children (assoc children index node))
                         (dirty!))
                     (pop init-path)))))))))
 
