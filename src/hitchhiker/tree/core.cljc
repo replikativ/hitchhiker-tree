@@ -324,18 +324,30 @@ throwable error."
   (split-node [this]
     (let [b (:index-b cfg)
           median (some-> (nth children (dec b)) last-key)
-          [left-buf right-buf] (split-with #(not (pos? (compare (:key %) median)))
-                                           ;;TODO this should use msg/affects-key
-                                           (sort-by :key compare op-buf))]
-      (->Split (index-node (subvec children 0 b)
-                           (promise-chan)
-                           (vec left-buf)
-                           cfg)
-               (index-node (subvec children b)
-                           (promise-chan)
-                           (vec right-buf)
-                           cfg)
-               median)))
+          ;;TODO this should use msg/affects-key
+          op-bufs (sort-by :key compare op-buf)]
+      (loop [op-bufs op-bufs
+             left-buf (transient [])
+             right-buf (transient [])]
+        (if-let [op-buf (first op-bufs)]
+          ;; check if we are still on  left side
+          (if (pos? (compare (:key op-buf) median))
+            (recur (next op-bufs)
+                   (conj! left-buf op-buf)
+                   right-buf)
+            ;; otherwise just copy the rest on the right
+            (recur nil
+                   left-buf
+                   (reduce conj! right-buf op-bufs)))
+          (->Split (index-node (subvec children 0 b)
+                               (promise-chan)
+                               (persistent! left-buf)
+                               cfg)
+                   (index-node (subvec children b)
+                               (promise-chan)
+                               (persistent! right-buf)
+                               cfg)
+                   median)))))
   (merge-node [this other]
     (index-node (catvec children (:children other))
                 (promise-chan)
