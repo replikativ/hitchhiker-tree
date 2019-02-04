@@ -331,7 +331,7 @@ throwable error."
              right-buf (transient [])]
         (if-let [op-buf (first op-bufs)]
           ;; check if we are still on  left side
-          (if (pos? (compare (:key op-buf) median))
+          (if (not (pos? (compare (:key op-buf) median)))
             (recur (next op-bufs)
                    (conj! left-buf op-buf)
                    right-buf)
