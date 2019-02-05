@@ -475,13 +475,23 @@ throwable error."
     (< (count children) (:data-b cfg)))
   (split-node [this]
     (let [data-b (:data-b cfg)]
-      (->Split (data-node cfg (into empty-sorted-map-by-compare
-                                    (take data-b)
-                                    children))
-               (data-node cfg (into empty-sorted-map-by-compare
-                                    (drop data-b)
-                                    children))
-               (nth-of-set children (dec data-b)))))
+      (loop [children children
+             i 0
+             left empty-sorted-map-by-compare
+             right empty-sorted-map-by-compare]
+        (if-let [child (first children)]
+          (if (< i data-b)
+            (recur (next children)
+                   (inc i)
+                   (conj left child)
+                   right)
+            (recur nil
+                   (inc i)
+                   left
+                   (reduce conj right children)))
+          (->Split (data-node cfg left)
+                   (data-node cfg right)
+                   (nth-of-set children (dec data-b)))))))
   (merge-node [this other]
     (data-node cfg (into children (:children other))))
   (lookup [root key]
