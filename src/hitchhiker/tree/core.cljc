@@ -837,7 +837,8 @@ throwable error."
   [cfg & kvs]
   (go-try
     (loop [[[k v] & r] (partition 2 kvs)
-           t (data-node cfg empty-sorted-map-by-compare)]
+           t (data-node cfg empty-sorted-map-by-compare)
+           ]
       (if k
         (recur r (<? (insert t k v)))
         t)))
@@ -904,7 +905,7 @@ throwable error."
   (write-node [_ node session]
     (go-try
       (swap! session update-in [:writes] inc)
-      (->TestingAddr (last-key node) node)))
+      (->TestingAddr (last-key node) (assoc node :*last-key-cache nil))))
   (delete-addr [_ addr session ]))
 
 (defn flush-tree
