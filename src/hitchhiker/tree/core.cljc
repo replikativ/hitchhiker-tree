@@ -905,7 +905,7 @@ throwable error."
   (write-node [_ node session]
     (go-try
       (swap! session update-in [:writes] inc)
-      (->TestingAddr (last-key node) (assoc node :*last-key-cache nil))))
+      (->TestingAddr (last-key node) (assoc node :*last-key-cache (volatile! ::nothing)))))
   (delete-addr [_ addr session ]))
 
 (defn flush-tree
