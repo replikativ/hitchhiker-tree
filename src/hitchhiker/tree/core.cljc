@@ -188,37 +188,70 @@ throwable error."
   (order-on-edn-types [t]))
 
 (extend-protocol OrderOnEDNTypes
-  IPersistentMap
-  (order-on-edn-types [_] 0)
+  #?@(:clj [IPersistentMap
+            (order-on-edn-types [_] 0)
 
-  IPersistentVector
-  (order-on-edn-types [_] 1)
+            IPersistentVector
+            (order-on-edn-types [_] 1)
 
-  IPersistentSet
-  (order-on-edn-types [_] 2)
+            IPersistentSet
+            (order-on-edn-types [_] 2)
 
-  Number
-  (order-on-edn-types [_] 3)
+            Number
+            (order-on-edn-types [_] 3)
 
-  String
-  (order-on-edn-types [_] 4)
+            String
+            (order-on-edn-types [_] 4)
 
-  Symbol
-  (order-on-edn-types [_] 5)
+            Symbol
+            (order-on-edn-types [_] 5)
 
-  Keyword
-  (order-on-edn-types [_] 6)
+            Keyword
+            (order-on-edn-types [_] 6)
 
-  Boolean
-  (order-on-edn-types [_] 7)
+            Boolean
+            (order-on-edn-types [_] 7)
 
-  nil
-  (order-on-edn-types [_] 10000)
+            nil
+            (order-on-edn-types [_] 10000)
 
-  Object
-  (order-on-edn-types [t]
-    (throw (ex-info (str "Type not supported:" (type t))
-                    {:value t}))))
+            Object
+            (order-on-edn-types [t]
+                                (throw (ex-info (str "Type not supported:"
+                                                     (type t))
+                                                {:value t})))]
+      :cljs [cljs.core/IMap
+             (order-on-edn-types [_] 0)
+
+             cljs.core/IVector
+             (order-on-edn-types [_] 1)
+
+             cljs.core/ISet
+             (order-on-edn-types [_] 2)
+
+             number
+             (order-on-edn-types [_] 3)
+
+             string
+             (order-on-edn-types [_] 4)
+
+             cljs.core/Symbol
+             (order-on-edn-types [_] 5)
+
+             cljs.core/Keyword
+             (order-on-edn-types [_] 6)
+
+             boolean
+             (order-on-edn-types [_] 7)
+
+             nil
+             (order-on-edn-types [_] 10000)
+
+             :default
+             (order-on-edn-types [t]
+                                 (throw (ex-info (str "Type not supported:"
+                                                      (type t))
+                                                 {:value t})))]))
 
 (extend-protocol IKeyCompare
   ;; By default, we use the default comparator
