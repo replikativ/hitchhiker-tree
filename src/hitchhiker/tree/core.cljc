@@ -247,7 +247,7 @@ throwable error."
              nil
              (order-on-edn-types [_] 10000)
 
-             :default
+             object
              (order-on-edn-types [t]
                                  (throw (ex-info (str "Type not supported:"
                                                       (type t))
@@ -540,24 +540,26 @@ throwable error."
   (->DataNode children (promise-chan) cfg
               (volatile! ::nothing)))
 
-(def satisfies?
-  ;; FIXME for now `(satisfies? IResolve node)` is crippled,
-  ;; implementers have no cache see:
-  ;; https://dev.clojure.org/jira/browse/CLJ-1814.  So we just check
-  ;; types manually to get x2 speed from satisfies?
+#?(:clj
+   (def satisfies?
+     ;; FIXME for now `(satisfies? IResolve node)` is crippled,
+     ;; implementers have no cache see:
+     ;; https://dev.clojure.org/jira/browse/CLJ-1814.  So we just check
+     ;; types manually to get x2 speed from satisfies?
 
-  ;; check cache first, otherwise call satisfies? and cache result
-  (let [cache (volatile! {})]
-    (fn [proto node]
-      ;; check cache first, otherwise call satisfies? and cache result
-      (let [kls (class node)
-            k [proto kls]
-            cached-val (get @cache k ::nothing)]
-        (if (identical? cached-val ::nothing)
-          (let [ret (clojure.core/satisfies? proto node)]
-            (vswap! cache assoc k ret)
-            ret)
-          cached-val)))))
+     ;; check cache first, otherwise call satisfies? and cache result
+     (let [cache (volatile! {})]
+       (fn [proto node]
+         ;; check cache first, otherwise call satisfies? and cache result
+         (let [kls (class node)
+               k [proto kls]
+               cached-val (get @cache k ::nothing)]
+           (if (identical? cached-val ::nothing)
+             (let [ret (clojure.core/satisfies? proto node)]
+               (vswap! cache assoc k ret)
+               ret)
+             cached-val)))))
+   :cljs (defn satisfies? [p x] (cljs.core/satisfies? p x)))
 
 (defn tree-node?
   [node]
