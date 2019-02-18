@@ -107,12 +107,12 @@ throwable error."
        (recur (<? (go-f res f)) r)
        res))))
 
-(defmacro <-cache [cache-sym & expr]
-  `(let [c# @~cache-sym]
-     (if (identical? c# ::nothing)
-       (vreset! ~cache-sym
-                (do ~@expr))
-       c#)))
+(defn <-cache [cache-sym calc-fn]
+  (let [c @cache-sym]
+    (if (#?(:clj identical? :cljs =) c ::nothing)
+      (vreset! cache-sym (calc-fn))
+      c)))
+
 
 (defrecord Config [index-b data-b op-buf-size])
 
@@ -316,9 +316,30 @@ throwable error."
        ]
       :cljs
       [number
-       (compare [key1 key2] (cljs.core/compare key1 key2))
+       (compare [key1 key2]
+                (if (or (= (type key1) (type key2))
+                        (= (order-on-edn-types key1)
+                           (order-on-edn-types key2)))
+                  (try
+                    (cljs.core/compare key1 key2)
+                    (catch js/Error e
+                      (- (order-on-edn-types key2)
+                         (order-on-edn-types key1))))
+                  (- (order-on-edn-types key2)
+                     (order-on-edn-types key1))))
        object
-       (compare [key1 key2] (cljs.core/compare key1 key2))]))
+       (compare [key1 key2]
+                (if (or (= (type key1) (type key2))
+                        (= (order-on-edn-types key1)
+                           (order-on-edn-types key2)))
+                  (try
+                    (cljs.core/compare key1 key2)
+                    (catch js/Error e
+                      (- (order-on-edn-types key2)
+                         (order-on-edn-types key1))))
+                  (- (order-on-edn-types key2)
+                     (order-on-edn-types key1))))
+       ]))
 
 ;; TODO enforce that there always (= (count children) (inc (count keys)))
 ;;
@@ -348,7 +369,7 @@ throwable error."
   (resolve [this] (go-try this))
   (last-key [this]
     (<-cache *last-key-cache
-             (last-key (peek children))))
+             #(last-key (peek children))))
   INode
   (overflow? [this]
     (>= (count children) (* 2 (:index-b cfg))))
@@ -495,7 +516,7 @@ throwable error."
            :*last-key-cache (volatile! ::nothing)))
   (last-key [this]
     (<-cache *last-key-cache
-             (when (seq children)
+             #(when (seq children)
                (-> children
                    (rseq)
                    (first)

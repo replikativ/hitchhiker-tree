@@ -1,5 +1,5 @@
 (ns hitchhiker.tree.core-test
-  (:refer-clojure :exclude [compare resolve])
+  (:refer-clojure :exclude [compare resolve satisfies?])
   (:require [clojure.test :refer :all]
             [clojure.test.check :as tc]
             [clojure.test.check.clojure-test :refer [defspec]]
