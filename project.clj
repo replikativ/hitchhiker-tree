@@ -7,7 +7,7 @@
                  [org.clojure/clojurescript "1.10.439" :scope "provided"]
                  [org.clojure/core.memoize "0.7.1"]
                  [com.taoensso/carmine "2.12.2"]
-                 [org.clojure/core.rrb-vector "0.0.13"]
+                 [org.clojure/core.rrb-vector "0.0.14"]
                  [org.clojure/core.cache "0.7.2"]
                  [io.replikativ/konserve "0.5.0"]]
   :aliases {"bench" ["with-profile" "profiling" "run" "-m" "hitchhiker.bench"]}
@@ -16,6 +16,7 @@
              {:dependencies [[org.clojure/test.check "0.9.0"]]}
              :profiling
              {:main hitchhiker.bench
+              :jvm-opts  ^:replace ["-server" "-Xmx3700m" "-Xms3700m"]
               :source-paths ["env/profiling"]
               :dependencies [[criterium "0.4.4"]
                              [org.clojure/tools.cli "0.4.1"]

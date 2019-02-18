@@ -26,6 +26,7 @@
 (defrecord KonserveAddr [store last-key konserve-key storage-addr]
   core/IResolve
   (dirty? [_] false)
+  (dirty! [this] this)
   (last-key [_] last-key)
   (resolve [_]
     ;; inline konserve cache resolution
@@ -42,11 +43,13 @@
                   (assoc :storage-addr (synthesize-storage-addr konserve-key)))))))))
 
 (defn node->value [node]
-  (if (core/index-node? node)
-    (-> (assoc node :storage-addr nil)
-        (update :children (fn [cs] (mapv #(assoc % :store nil
-                                                 :storage-addr nil) cs))))
-    (assoc node :storage-addr nil)))
+  (-> (if (core/index-node? node)
+        (-> (assoc node :storage-addr nil)
+            (update :children (fn [cs] (mapv #(assoc %
+                                                     :store nil
+                                                     :storage-addr nil) cs))))
+        (assoc node :storage-addr nil))
+      (assoc :*last-key-cache nil)))
 
 (defrecord KonserveBackend [store]
   core/IBackend
@@ -85,26 +88,24 @@
      (<? (core/resolve
           (->KonserveAddr store last-key root-key (synthesize-storage-addr root-key)))))))
 
-
 (defn add-hitchhiker-tree-handlers [store]
   (swap! (:read-handlers store) merge
          {'hitchhiker.konserve.KonserveAddr
           #(-> % map->KonserveAddr
-             (assoc :store store
-                    :storage-addr (synthesize-storage-addr (:konserve-key %))))
+               (assoc :store store
+                      :storage-addr (synthesize-storage-addr (:konserve-key %))))
           'hitchhiker.tree.core.DataNode
           (fn [{:keys [children cfg]}]
-            (core/->DataNode (into (sorted-map-by
-                                    compare) children)
-                             (promise-chan)
-                             cfg))
+            (core/data-node cfg
+                            (into (sorted-map-by
+                                   compare)
+                                  children)))
           'hitchhiker.tree.core.IndexNode
           (fn [{:keys [children cfg op-buf]}]
-            (core/->IndexNode (->> children
-                                 vec)
-                              (promise-chan)
-                              (vec op-buf)
-                              cfg))
+            (core/index-node (vec children)
+                             (promise-chan)
+                             (vec op-buf)
+                             cfg))
           'hitchhiker.tree.messaging.InsertOp
           msg/map->InsertOp
           'hitchhiker.tree.messaging.DeleteOp
@@ -119,15 +120,14 @@
                    :storage-addr nil))
           'hitchhiker.tree.core.DataNode
           (fn [node]
-            (assoc node :storage-addr nil))
+            (assoc node :storage-addr nil :*last-key-cache nil))
           'hitchhiker.tree.core.IndexNode
           (fn [node]
             (-> node
-               (assoc :storage-addr nil)
+               (assoc :storage-addr nil :*last-key-cache nil)
                (update-in [:children]
-                          (fn [cs] (map #(assoc % :store nil :storage-addr nil) cs)))))}) 
+                          (fn [cs] (map #(assoc %
+                                                :store nil
+                                                :*last-key-cache nil
+                                                :storage-addr nil) cs)))))})
   store)
-
-
-
-

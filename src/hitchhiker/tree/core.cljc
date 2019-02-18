@@ -1,5 +1,5 @@
 (ns hitchhiker.tree.core
-  (:refer-clojure :exclude [compare resolve subvec])
+  (:refer-clojure :exclude [compare resolve subvec satisfies?])
   (:require [hitchhiker.tree.async]
             [clojure.core.rrb-vector :refer [catvec subvec]]
             #?(:clj [clojure.pprint :as pp])
@@ -15,9 +15,9 @@
   #?(:cljs (:require-macros [cljs.core.async.macros :refer [go]]
                            [hitchhiker.tree.core :refer [go-try <? <?resolve]]
                            [hitchhiker.tree.async :refer [case-async]]))
-  #?(:clj (:import clojure.lang.PersistentTreeMap$BlackVal)))
-
-
+  #?(:clj (:import (clojure.lang PersistentTreeMap$BlackVal IPersistentVector
+                                 IPersistentSet IPersistentMap
+                                 Symbol Keyword))))
 ;; check cljs macro environment
 (defn- cljs-env?
   "Take the &env from a macro, and tell whether we are expanding into cljs."
@@ -107,10 +107,16 @@ throwable error."
        (recur (<? (go-f res f)) r)
        res))))
 
-
-;; core code
+(defmacro <-cache [cache-sym & expr]
+  `(let [c# @~cache-sym]
+     (if (identical? c# ::nothing)
+       (vreset! ~cache-sym
+                (do ~@expr))
+       c#)))
 
 (defrecord Config [index-b data-b op-buf-size])
+
+;; core code
 
 (defprotocol IKeyCompare
   (compare [key1 key2]))
@@ -121,14 +127,9 @@ throwable error."
   (index? [_] "Returns true if this is an index node")
   (last-key [_] "Returns the rightmost key of the node")
   (dirty? [_] "Returns true if this should be flushed")
+  (dirty! [_] "Marks a node as being dirty if it was clean")
   ;;TODO resolve should be instrumented
   (resolve [_] "Returns the INode version of this node in a go-block; could trigger IO"))
-
-
-
-(defn tree-node?
-  [node]
-  (satisfies? IResolve node))
 
 (defprotocol INode
   (overflow? [node] "Returns true if this node has too many elements")
@@ -182,21 +183,75 @@ throwable error."
 ;; our targets.
 
 ;; TODO add full edn support including records
-(defn order-on-edn-types [t]
-  (cond (map? t) 0
-        (vector? t) 1
-        (set? t) 2
-        (number? t) 3
-        (string? t) 4
-        (symbol? t) 5
-        (keyword? t) 6
-        ;; TODO use boolean? when datahike is on 1.9+
-        (or (true? t) (false? t)) 7
 
-        (nil? t) 10000
-        :else (throw (ex-info (str "Type not supported:" (type t))
-                              {:value t}))))
+(defprotocol OrderOnEDNTypes
+  (order-on-edn-types [t]))
 
+(extend-protocol OrderOnEDNTypes
+  #?@(:clj [IPersistentMap
+            (order-on-edn-types [_] 0)
+
+            IPersistentVector
+            (order-on-edn-types [_] 1)
+
+            IPersistentSet
+            (order-on-edn-types [_] 2)
+
+            Number
+            (order-on-edn-types [_] 3)
+
+            String
+            (order-on-edn-types [_] 4)
+
+            Symbol
+            (order-on-edn-types [_] 5)
+
+            Keyword
+            (order-on-edn-types [_] 6)
+
+            Boolean
+            (order-on-edn-types [_] 7)
+
+            nil
+            (order-on-edn-types [_] 10000)
+
+            Object
+            (order-on-edn-types [t]
+                                (throw (ex-info (str "Type not supported:"
+                                                     (type t))
+                                                {:value t})))]
+      :cljs [cljs.core/IMap
+             (order-on-edn-types [_] 0)
+
+             cljs.core/IVector
+             (order-on-edn-types [_] 1)
+
+             cljs.core/ISet
+             (order-on-edn-types [_] 2)
+
+             number
+             (order-on-edn-types [_] 3)
+
+             string
+             (order-on-edn-types [_] 4)
+
+             cljs.core/Symbol
+             (order-on-edn-types [_] 5)
+
+             cljs.core/Keyword
+             (order-on-edn-types [_] 6)
+
+             boolean
+             (order-on-edn-types [_] 7)
+
+             nil
+             (order-on-edn-types [_] 10000)
+
+             object
+             (order-on-edn-types [t]
+                                 (throw (ex-info (str "Type not supported:"
+                                                      (type t))
+                                                 {:value t})))]))
 
 (extend-protocol IKeyCompare
   ;; By default, we use the default comparator
@@ -259,7 +314,7 @@ throwable error."
                       (- (order-on-edn-types key2)
                          (order-on-edn-types key1))))))
        ]
-     :cljs
+      :cljs
       [number
        (compare [key1 key2] (cljs.core/compare key1 key2))
        object
@@ -275,18 +330,25 @@ throwable error."
 (defn index-node-keys
   "Calculates the separating keys given the children of an index node"
   [children]
-  (mapv last-key (butlast children)))
+  (into []
+        (map last-key)
+        (pop children)))
 
-(declare ->IndexNode)
+(declare index-node)
 
-(defrecord IndexNode [children storage-addr op-buf cfg]
+(defrecord IndexNode [children storage-addr op-buf cfg
+                      *last-key-cache]
   IResolve
   (index? [this] true)
   (dirty? [this] (not (poll! storage-addr)))
+  (dirty! [this]
+    (assoc this
+           :storage-addr (promise-chan)
+           :*last-key-cache (volatile! ::nothing)))
   (resolve [this] (go-try this))
   (last-key [this]
-    ;;TODO should optimize by caching to reduce IOps (can use monad)
-    (last-key (peek children)))
+    (<-cache *last-key-cache
+             (last-key (peek children))))
   INode
   (overflow? [this]
     (>= (count children) (* 2 (:index-b cfg))))
@@ -294,24 +356,36 @@ throwable error."
     (< (count children) (:index-b cfg)))
   (split-node [this]
     (let [b (:index-b cfg)
-          median (nth (index-node-keys children) (dec b))
-          [left-buf right-buf] (split-with #(not (pos? (compare (:key %) median)))
-                                           ;;TODO this should use msg/affects-key
-                                           (sort-by :key compare op-buf))]
-      (->Split (->IndexNode (subvec children 0 b)
-                            (promise-chan)
-                            (vec left-buf)
-                            cfg)
-               (->IndexNode (subvec children b)
-                            (promise-chan)
-                            (vec right-buf)
-                            cfg)
-              median)))
+          median (some-> (nth children (dec b)) last-key)
+          ;;TODO this should use msg/affects-key
+          op-bufs (sort-by :key compare op-buf)]
+      (loop [op-bufs op-bufs
+             left-buf (transient [])
+             right-buf (transient [])]
+        (if-let [op-buf (first op-bufs)]
+          ;; check if we are still on  left side
+          (if (not (pos? (compare (:key op-buf) median)))
+            (recur (next op-bufs)
+                   (conj! left-buf op-buf)
+                   right-buf)
+            ;; otherwise just copy the rest on the right
+            (recur nil
+                   left-buf
+                   (reduce conj! right-buf op-bufs)))
+          (->Split (index-node (subvec children 0 b)
+                               (promise-chan)
+                               (persistent! left-buf)
+                               cfg)
+                   (index-node (subvec children b)
+                               (promise-chan)
+                               (persistent! right-buf)
+                               cfg)
+                   median)))))
   (merge-node [this other]
-    (->IndexNode (catvec children (:children other))
-                 (promise-chan)
-                 (catvec op-buf (:op-buf other))
-                 cfg))
+    (index-node (catvec children (:children other))
+                (promise-chan)
+                (catvec op-buf (:op-buf other))
+                cfg))
   (lookup [root key]
     ;;This is written like so because it's performance critical
     (let [l (dec (count children))
@@ -323,6 +397,11 @@ throwable error."
       (if (neg? x)
         (- (inc x))
         x))))
+
+(defn index-node
+  [children storage-addr op-buf cfg]
+  (->IndexNode children storage-addr op-buf cfg
+               (volatile! ::nothing)))
 
 #?(:clj
    (nippy/extend-freeze IndexNode :b-tree/index-node
@@ -339,11 +418,7 @@ throwable error."
                       (let [cfg (nippy/thaw-from-in! data-input)
                             children (nippy/thaw-from-in! data-input)
                             op-buf (nippy/thaw-from-in! data-input)]
-                        (->IndexNode children nil op-buf cfg))))
-
-(defn index-node?
-  [node]
-  (instance? IndexNode node))
+                        (index-node children nil op-buf cfg))))
 
 #?(:clj
    (defn print-index-node
@@ -394,21 +469,37 @@ throwable error."
          (pp/write-out (:children node)))))))
 
 (defn nth-of-set
-  "Like nth, but for sorted sets. O(n)"
+  "Like nth, but for sorted sets. O(n) in worst case, 0(1) when idx out
+  of bounds."
   [set index]
-  (first (drop index set)))
+  ;; we can escape early for free since sorted-sets are ICounted
+  (when (> (count set) index)
+    (loop [i 0
+           set set]
+      (if (< i index)
+        (recur (unchecked-inc i)
+               (next set))
+        (first set)))))
 
-(defrecord DataNode [children storage-addr cfg]
+(def empty-sorted-map-by-compare (sorted-map-by compare))
+
+(defrecord DataNode [children storage-addr cfg
+                     *last-key-cache]
   IResolve
   (index? [this] false)
   (resolve [this] this)
   (dirty? [this] (not (poll! storage-addr)))
+  (dirty! [this]
+    (assoc this
+           :storage-addr (promise-chan)
+           :*last-key-cache (volatile! ::nothing)))
   (last-key [this]
-    (when (seq children)
-      (-> children
-          (rseq)
-          (first)
-          (key))))
+    (<-cache *last-key-cache
+             (when (seq children)
+               (-> children
+                   (rseq)
+                   (first)
+                   (key)))))
   INode
   ;; Should have between b & 2b-1 children
   (overflow? [this]
@@ -416,9 +507,24 @@ throwable error."
   (underflow? [this]
     (< (count children) (:data-b cfg)))
   (split-node [this]
-    (->Split (data-node cfg (into (sorted-map-by compare) (take (:data-b cfg)) children))
-             (data-node cfg (into (sorted-map-by compare) (drop (:data-b cfg)) children))
-             (nth-of-set children (dec (:data-b cfg)))))
+    (let [data-b (:data-b cfg)]
+      (loop [children children
+             i 0
+             left empty-sorted-map-by-compare
+             right empty-sorted-map-by-compare]
+        (if-let [child (first children)]
+          (if (< i data-b)
+            (recur (next children)
+                   (inc i)
+                   (conj left child)
+                   right)
+            (recur nil
+                   (inc i)
+                   left
+                   (reduce conj right children)))
+          (->Split (data-node cfg left)
+                   (data-node cfg right)
+                   (nth-of-set children (dec data-b)))))))
   (merge-node [this other]
     (data-node cfg (into children (:children other))))
   (lookup [root key]
@@ -431,7 +537,37 @@ throwable error."
 (defn data-node
   "Creates a new data node"
   [cfg children]
-  (->DataNode children (promise-chan) cfg))
+  (->DataNode children (promise-chan) cfg
+              (volatile! ::nothing)))
+
+#?(:clj
+   (def satisfies?
+     ;; FIXME for now `(satisfies? IResolve node)` is crippled,
+     ;; implementers have no cache see:
+     ;; https://dev.clojure.org/jira/browse/CLJ-1814.  So we just check
+     ;; types manually to get x2 speed from satisfies?
+
+     ;; check cache first, otherwise call satisfies? and cache result
+     (let [cache (volatile! {})]
+       (fn [proto node]
+         ;; check cache first, otherwise call satisfies? and cache result
+         (let [kls (class node)
+               k [proto kls]
+               cached-val (get @cache k ::nothing)]
+           (if (identical? cached-val ::nothing)
+             (let [ret (clojure.core/satisfies? proto node)]
+               (vswap! cache assoc k ret)
+               ret)
+             cached-val)))))
+   :cljs (defn satisfies? [p x] (cljs.core/satisfies? p x)))
+
+(defn tree-node?
+  [node]
+  (satisfies? IResolve node))
+
+(defn index-node?
+  [node]
+  (instance? IndexNode node))
 
 (defn data-node?
   [node]
@@ -457,7 +593,7 @@ throwable error."
                       [data-input]
                       (let [cfg (nippy/thaw-from-in! data-input)
                             children (nippy/thaw-from-in! data-input)]
-                        (->DataNode children nil cfg))))
+                        (data-node cfg children))))
 
 ;(println (b-tree :foo :bar :baz))
 ;(pp/pprint (apply b-tree (range 100)))
@@ -494,15 +630,13 @@ throwable error."
    it was true, or else we return the empty path"
   [path pred]
   (loop [path path]
-    (when (seq path)
+    (when (pos? (count path))
       (let [from-index (peek path)
             tmp (pop path)
             parent (peek tmp)]
         (if (pred parent from-index)
           path
           (recur (pop tmp)))))))
-
-
 
 (defn right-successor
   "Given a node on a path, find's that node's right successor node"
@@ -521,7 +655,7 @@ throwable error."
             new-sibling (<?resolve (nth (:children parent) next-index))
             ;; We must get back down to the data node
             ;; iterate cannot do blocking operations with core.async, so we use a loop
-            sibling-lineage (loop [res [new-sibling]
+            sibling-lineage (loop [res (transient [new-sibling])
                                     s new-sibling]
                               (let [c (-> s :children first)
                                     ;_ (prn (type c) (= (class c) clojure.lang.PersistentTreeMap$BlackVal))
@@ -533,15 +667,14 @@ throwable error."
                                             #?(:clj (= (class c) clojure.lang.PersistentTreeMap$Black))
                                             #?(:clj (= (class c) clojure.lang.PersistentTreeMap$BlackVal)))
                                         c
-
                                         (tree-node? c)
                                         (<?resolve c)
 
                                         :else c)]
                                 (if (or (index-node? c)
                                         (data-node? c))
-                                  (recur (conj res c) c)
-                                  res)))
+                                  (recur (conj! res c) c)
+                                  (persistent! res))))
             path-suffix (-> (interleave sibling-lineage
                                         (repeat 0))
                             (butlast)) ; butlast ensures we end w/ node
@@ -550,29 +683,28 @@ throwable error."
             (conj next-index)
             (into path-suffix))))))
 
-
-
-
 (defn lookup-path
   "Given a B-tree and a key, gets a path into the tree"
   [tree key]
   (go-try
-    (loop [path [tree] ;alternating node/index/node/index/node... of the search taken
+    (loop [path (transient [tree]) ;alternating node/index/node/index/node... of the search taken
            cur tree ;current search node
            ]
-      (if (seq (:children cur))
-        (if (data-node? cur)
-          path
-          (let [index (lookup cur key)
-                child (if (data-node? cur)
-                        nil #_(nth-of-set (:children cur) index)
-                        (-> (:children cur)
-                            ;;TODO what are the semantics for exceeding on the right? currently it's trunc to the last element
-                            (nth index (peek (:children cur)))
-                            (<?resolve)))
-                path' (conj path index child)]
-            (recur path' child)))
-        nil))))
+      (let [children (:children cur)]
+        (when (> (count children) 0)
+          (if (data-node? cur)
+            (persistent! path)
+            (let [index (lookup cur key)
+                  child (if (data-node? cur)
+                          nil #_(nth-of-set (:children cur) index)
+                          (-> children
+                              ;;TODO what are the semantics for exceeding on the right? currently it's trunc to the last element
+                              (nth index (peek children))
+                              (<?resolve)))]
+              (recur (-> path
+                         (conj! index)
+                         (conj! child))
+                     child))))))))
 
 (defn lookup-key
   "Given a B-tree and a key, gets an iterator into the tree"
@@ -580,12 +712,11 @@ throwable error."
    (lookup-key tree key nil))
   ([tree key not-found]
    (go-try
-     (->
-      (-> (<? (lookup-path tree key))
-          (peek)
-          (<?resolve))
-      :children
-      (get key not-found)))))
+     (-> (<? (lookup-path tree key))
+         (peek)
+         (<?resolve)
+         :children
+         (get key not-found)))))
 
 ;; this is only for the REPL and testing
 
@@ -652,33 +783,34 @@ throwable error."
 (defn insert
   [{:keys [cfg] :as tree} key value]
   (go-try
-    (let [path (<? (lookup-path tree key))
-          {:keys [children] :or {children (sorted-map-by compare)}} (peek path)
-          updated-data-node (data-node cfg (assoc children key value))]
-      (loop [node updated-data-node
-             path (pop path)]
-        (if (empty? path)
-          (if (overflow? node)
-            (let [{:keys [left right median]} (split-node node)]
-              (->IndexNode [left right] (promise-chan) [] cfg))
-            node)
-          (let [index (peek path)
-                {:keys [children keys] :as parent} (peek (pop path))]
-            (if (overflow? node) ; splice the split into the parent
-              ;;TODO refactor paths to be node/index pairs or 2 vectors or something
-              (let [{:keys [left right median]} (split-node node)
-                    new-children (catvec (conj (subvec children 0 index)
-                                               left right)
-                                         (subvec children (inc index)))]
-                (recur (-> parent
-                           (assoc :children new-children)
-                           (dirty!))
-                       (pop (pop path))))
-              (recur (-> parent
-                         ;;TODO this assoc-in seems to be a bottleneck
-                         (assoc-in [:children index] node)
-                         (dirty!))
-                     (pop (pop path))))))))))
+   (let [path (<? (lookup-path tree key))
+         {:keys [children] :or {children empty-sorted-map-by-compare}} (peek path)
+         updated-data-node (data-node cfg (assoc children key value))]
+     (loop [node updated-data-node
+            path (pop path)]
+       (if (empty? path)
+         (if (overflow? node)
+           (let [{:keys [left right median]} (split-node node)]
+             (index-node [left right] (promise-chan) [] cfg))
+           node)
+         (let [index (peek path)
+               init-path (pop path)
+               {:keys [children keys] :as parent} (peek init-path)]
+           (if (overflow? node) ; splice the split into the parent
+             ;;TODO refactor paths to be node/index pairs or 2 vectors or something
+             (let [{:keys [left right median]} (split-node node)
+                   new-children (catvec (conj (subvec children 0 index)
+                                              left right)
+                                        (subvec children (inc index)))]
+               (recur (-> parent
+                          (assoc :children new-children)
+                          (dirty!))
+                      (pop init-path)))
+             (recur (-> parent
+                        ;;TODO this assoc seems to be a bottleneck
+                        (assoc :children (assoc children index node))
+                        (dirty!))
+                    (pop init-path)))))))))
 
 ;;TODO: cool optimization: when merging children, push as many operations as you can
 ;;into them to opportunistically minimize overall IO costs
@@ -686,59 +818,62 @@ throwable error."
 (defn delete
   [{:keys [cfg] :as tree} key]
   (go-try
-    (let [path (<? (lookup-path tree key)) ; don't care about the found key or its index
-          {:keys [children] :or {children (sorted-map-by compare)}} (peek path)
-          updated-data-node (data-node cfg (dissoc children key))]
-      (loop [node updated-data-node
-             path (pop path)]
-        (if (empty? path)
-          ;; Check for special root underflow case
-          (if (and (index-node? node) (= 1 (count (:children node))))
-            (first (:children node))
-            node)
-          (let [index (peek path)
-                {:keys [children keys op-buf] :as parent} (peek (pop path))]
-            (if (underflow? node) ; splice the split into the parent
-              ;;TODO this needs to use a polymorphic sibling-count to work on serialized nodes
-              (let [bigger-sibling-idx
-                    (cond
-                      (= (dec (count children)) index) (dec index) ; only have left sib
-                      (zero? index) 1 ;only have right sib
-                      (> (count (:children (nth children (dec index))))
-                         (count (:children (nth children (inc index)))))
-                      (dec index) ; right sib bigger
-                      :else (inc index))
-                    node-first? (> bigger-sibling-idx index) ; if true, `node` is left
-                    merged (if node-first?
-                             (merge-node node (<?resolve (nth children bigger-sibling-idx)))
-                             (merge-node (<?resolve (nth children bigger-sibling-idx)) node))
-                    old-left-children (subvec children 0 (min index bigger-sibling-idx))
-                    old-right-children (subvec children (inc (max index bigger-sibling-idx)))]
-                (if (overflow? merged)
-                  (let [{:keys [left right median]} (split-node merged)]
-                    (recur (->IndexNode (catvec (conj old-left-children left right)
-                                                old-right-children)
-                                        (promise-chan)
-                                        op-buf
-                                        cfg)
-                           (pop (pop path))))
-                  (recur (->IndexNode (catvec (conj old-left-children merged)
+   (let [path (<? (lookup-path tree key)) ; don't care about the found key or its index
+         {:keys [children] :or {children empty-sorted-map-by-compare}} (peek path)
+         updated-data-node (data-node cfg (dissoc children key))]
+     (loop [node updated-data-node
+            path (pop path)]
+       (if (empty? path)
+         ;; Check for special root underflow case
+         (if (and (index-node? node) (= 1 (count (:children node))))
+           (first (:children node))
+           node)
+         (let [index (peek path)
+               init-path (pop path)
+               {:keys [children keys op-buf] :as parent} (peek init-path)]
+           (if (underflow? node) ; splice the split into the parent
+             ;;TODO this needs to use a polymorphic sibling-count to work on serialized nodes
+             (let [bigger-sibling-idx
+                   (cond
+                     (= (dec (count children)) index) (dec index) ; only have left sib
+                     (zero? index) 1 ;only have right sib
+                     (> (count (:children (nth children (dec index))))
+                        (count (:children (nth children (inc index)))))
+                     (dec index) ; right sib bigger
+                     :else (inc index))
+                   node-first? (> bigger-sibling-idx index) ; if true, `node` is left
+                   merged (if node-first?
+                            (merge-node node (<?resolve (nth children bigger-sibling-idx)))
+                            (merge-node (<?resolve (nth children bigger-sibling-idx)) node))
+                   old-left-children (subvec children 0 (min index bigger-sibling-idx))
+                   old-right-children (subvec children (inc (max index bigger-sibling-idx)))]
+               (if (overflow? merged)
+                 (let [{:keys [left right median]} (split-node merged)]
+                   (recur (index-node (catvec (conj old-left-children left right)
                                               old-right-children)
                                       (promise-chan)
                                       op-buf
                                       cfg)
-                         (pop (pop path)))))
-              (recur (->IndexNode (assoc children index node)
-                                  (promise-chan)
-                                  op-buf
-                                  cfg)
-                     (pop (pop path))))))))))
+                          (pop init-path)))
+                 (recur (index-node (catvec (conj old-left-children merged)
+
+                                            old-right-children)
+                                    (promise-chan)
+                                    op-buf
+                                    cfg)
+                        (pop init-path))))
+             (recur (index-node (assoc children index node)
+                                (promise-chan)
+                                op-buf
+                                cfg)
+                    (pop init-path)))))))))
 
 (defn b-tree
   [cfg & kvs]
   (go-try
     (loop [[[k v] & r] (partition 2 kvs)
-           t (data-node cfg (sorted-map-by compare))]
+           t (data-node cfg empty-sorted-map-by-compare)
+           ]
       (if k
         (recur r (<? (insert t k v)))
         t)))
@@ -750,6 +885,7 @@ throwable error."
 (defrecord TestingAddr [last-key node]
   IResolve
   (dirty? [this] false)
+  (dirty! [this] this)
   (last-key [_] last-key)
   (resolve [_] (go-try node)))
 
@@ -779,12 +915,6 @@ throwable error."
                         (node-status-bits node)))
        (.write out (str {})))))
 
-(defn dirty!
-  "Marks a node as being dirty if it was clean"
-  [node]
-  (assert (not (instance? TestingAddr node)))
-  (assoc node :storage-addr (promise-chan)))
-
 ;;TODO make this a loop/recur instead of mutual recursion
 (declare flush-tree)
 
@@ -792,10 +922,10 @@ throwable error."
   [children backend session]
   (go-try
       (loop [[c & r] children
-             res []]
+             res (transient [])]
         (if-not c
-          res
-          (recur r (conj res (<? (flush-tree c backend session))))))))
+          (persistent! res)
+          (recur r (conj! res (<? (flush-tree c backend session))))))))
 
 (defprotocol IBackend
   (new-session [backend] "Returns a session object that will collect stats")
@@ -810,7 +940,7 @@ throwable error."
   (write-node [_ node session]
     (go-try
       (swap! session update-in [:writes] inc)
-      (->TestingAddr (last-key node) node)))
+      (->TestingAddr (last-key node) (assoc node :*last-key-cache (volatile! ::nothing)))))
   (delete-addr [_ addr session ]))
 
 (defn flush-tree
@@ -849,10 +979,10 @@ throwable error."
   [children backend session]
   (go-try
    (loop [[c & r] children
-          res []]
+          res (transient [])]
      (if-not c
-       res
-       (recur r (conj res (<? (flush-tree-without-root c backend session false))))))))
+       (persistent! res)
+       (recur r (conj! res (<? (flush-tree-without-root c backend session false))))))))
 
 
 (defn flush-tree-without-root

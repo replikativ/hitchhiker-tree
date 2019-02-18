@@ -10,9 +10,10 @@
 
 (defn generate-test-datasets
   "Returns a list of datasets"
-  []
-  [{:name "in-order" :data (range)}
-   {:name "random" :data (repeatedly rand)}])
+  [seed]
+  (let [rnd (java.util.Random. seed)]
+    [{:name "in-order" :data (range)}
+     {:name "random" :data (repeatedly (fn [] (.nextFloat rnd)))}]))
 
 (defn core-b-tree
   "Returns a b-tree with core insert"
@@ -69,6 +70,7 @@
                  t 0
                  tree structure
                  last-flush nil
+
                  i 0
                  inserting? true
                  outputs []]
@@ -144,6 +146,9 @@
     :default 1000
     :parse-fn #(Long. %)
     :validate [pos? "flush frequency must be positive"]]
+   ["-r" "--rnd-seed SEED" "SEED for random gen. Useful to allow repeatable/comparable profiling"
+    :default (rand Long/MAX_VALUE)
+    :parse-fn #(Long. %)]
    ["-h" "--help" "Prints this help"]])
 
 (defn exit
@@ -238,8 +243,9 @@
                             "__n_"
                             (:num-operations options)
                             "__del_"
-                            (:delete-pattern options))]
-          (doseq [ds (generate-test-datasets)
+                            (:delete-pattern options))
+              rdn-seed (:rnd-seed options)]
+          (doseq [ds (generate-test-datasets rdn-seed)
                   :let [codename (str codename
                                       "_"
                                       (:name ds))
