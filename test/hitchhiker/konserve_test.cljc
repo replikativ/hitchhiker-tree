@@ -3,187 +3,172 @@
   (:require [clojure.core.rrb-vector :refer [catvec vec]]
             [#?(:clj clojure.test :cljs cljs.test)
              #?(:clj :refer :cljs :refer-macros) [deftest testing run-tests is
-                                                 #?(:cljs async)]]
+                                                  #?(:cljs async)]]
             [clojure.test.check.clojure-test #?(:clj :refer :cljs :refer-macros) [defspec]]
-            [clojure.test.check.generators :as gen #?@(:cljs [:include-macros true])]
-            [clojure.test.check.properties :as prop #?@(:cljs [:include-macros true])]
+            [clojure.test.check.generators :as gen :include-macros true]
+            [clojure.test.check.properties :as prop :include-macros true]
             [konserve.filestore :refer [new-fs-store delete-store list-keys]]
             [konserve.memory :refer [new-mem-store]]
-            [hitchhiker.konserve :as kons]
+            [hitchhiker.tree.bootstrap.konserve :as kons]
             [konserve.cache :as kc]
             [hasch.core :as hasch]
-            [hitchhiker.tree.core #?(:clj :refer :cljs :refer-macros)
-             [<?? <? go-try] :as core]
+            [hitchhiker.tree :as core]
+            [hitchhiker.tree.utils.async :as ha :include-macros true]
             [hitchhiker.tree.messaging :as msg]
-            #?(:clj [hitchhiker.tree.async :refer [case-async]])
             [hitchhiker.ops :refer [recorded-ops]]
             #?(:cljs [cljs.core.async :refer [promise-chan] :as async]
-              :clj [clojure.core.async :refer [promise-chan] :as async])
+               :clj [clojure.core.async :refer [promise-chan] :as async])
             #?(:cljs [cljs.nodejs :as nodejs])
-            [clojure.string :as str])
-  #?(:cljs (:require-macros [hitchhiker.tree.async :refer [case-async]])))
+            [clojure.string :as str]))
 
 #?(:cljs
    (do
      (nodejs/enable-util-print!)
      (enable-console-print!)))
 
-
 (defn iter-helper [tree key]
-  (case-async
-    :none
-    (if-let [path (core/lookup-path tree key)]
-      (msg/forward-iterator path)
-      [])
-    :core.async
-    (go-try
-     (let [iter-ch (async/chan)
-           path (<? (core/lookup-path tree key))]
-       (when path
-         (msg/forward-iterator iter-ch path key))
-       (<? (async/into [] iter-ch))))))
-
-
+  (ha/go-try
+   (let [iter-ch (async/chan)
+         path (ha/<? (core/lookup-path tree key))]
+     (when path
+       (msg/forward-iterator iter-ch path key))
+     (ha/<? (async/into [] iter-ch)))))
 
 (deftest simple-konserve-test
   (testing "Insert and lookup"
     #?(:cljs
        (async done
-        (go-try
-         (let [folder "/tmp/async-hitchhiker-tree-test"
-               _ (delete-store folder)
-               store (kons/add-hitchhiker-tree-handlers
-                      (kc/ensure-cache (async/<!
-                                        (new-mem-store)
-                                        #_(new-fs-store folder)))) ;; always use core.async here!
-               backend (kons/->KonserveBackend store)
-               init-tree (<? (core/reduce< (fn [t i] (msg/insert t i i))
-                                           (<? (core/b-tree (core/->Config 1 3 (- 3 1))))
-                                           (range 1 11)))
-               flushed (<? (core/flush-tree init-tree backend))
-               root-key (kons/get-root-key (:tree flushed))
-               tree (<? (kons/create-tree-from-root-key store root-key))]
-           (is (= (<? (msg/lookup tree -10)) nil))
-           (is (= (<? (msg/lookup tree 100)) nil))
-           (dotimes [i 10]
-             (is (= (<? (msg/lookup tree (inc i))) (inc i))))
-           (is (= (map first (<? (iter-helper tree 4))) (range 4 11)))
-           (is (= (map first (<? (iter-helper tree 0))) (range 1 11)))
-           (let [deleted (<? (core/flush-tree (<? (msg/delete tree 3)) backend))
-                 root-key (kons/get-root-key (:tree deleted))
-                 tree (<? (kons/create-tree-from-root-key store root-key))]
-             (is (= (<? (msg/lookup tree 2)) 2))
-             (is (= (<? (msg/lookup tree 3)) nil))
-             (is (= (<? (msg/lookup tree 4)) 4)))
-           (delete-store folder)
-           (done)))))
+              (ha/go-try
+               (let [folder "/tmp/async-hitchhiker-tree-test"
+                     _ (delete-store folder)
+                     store (kons/add-hitchhiker-tree-handlers
+                            (kc/ensure-cache (async/<!
+                                              (new-mem-store)
+                                              #_(new-fs-store folder)))) ;; always use core.async here!
+                     backend (kons/->KonserveBackend store)
+                     init-tree (ha/<? (ha/reduce< (fn [t i] (msg/insert t i i))
+                                                  (ha/<? (core/b-tree (core/->Config 1 3 (- 3 1))))
+                                                  (range 1 11)))
+                     flushed (ha/<? (core/flush-tree init-tree backend))
+                     root-key (kons/get-root-key (:tree flushed))
+                     tree (ha/<? (kons/create-tree-from-root-key store root-key))]
+                 (is (= (ha/<? (msg/lookup tree -10)) nil))
+                 (is (= (ha/<? (msg/lookup tree 100)) nil))
+                 (dotimes [i 10]
+                   (is (= (ha/<? (msg/lookup tree (inc i))) (inc i))))
+                 (is (= (map first (ha/<? (iter-helper tree 4))) (range 4 11)))
+                 (is (= (map first (ha/<? (iter-helper tree 0))) (range 1 11)))
+                 (let [deleted (ha/<? (core/flush-tree (ha/<? (msg/delete tree 3)) backend))
+                       root-key (kons/get-root-key (:tree deleted))
+                       tree (ha/<? (kons/create-tree-from-root-key store root-key))]
+                   (is (= (ha/<? (msg/lookup tree 2)) 2))
+                   (is (= (ha/<? (msg/lookup tree 3)) nil))
+                   (is (= (ha/<? (msg/lookup tree 4)) 4)))
+                 (delete-store folder)
+                 (done)))))
     #?(:clj
        (let [folder "/tmp/async-hitchhiker-tree-test"
              _ (delete-store folder)
              store (kons/add-hitchhiker-tree-handlers
                     (kc/ensure-cache (async/<!! (new-fs-store folder :config {:fsync false}))))
              backend (kons/->KonserveBackend store)
-             flushed (<?? (core/flush-tree
-                           (time (reduce (fn [t i]
-                                           (<?? (msg/insert t i i)))
-                                         (<?? (core/b-tree (core/->Config 1 3 (- 3 1))))
-                                         (range 1 11)))
-                           backend))
+             flushed (ha/<?? (core/flush-tree
+                              (time (reduce (fn [t i]
+                                              (prn :pre-insert i)
+                                              (ha/<?? (msg/insert t i i)))
+                                            (ha/<?? (core/b-tree (core/->Config 1 3 (- 3 1))))
+                                            (range 1 11)))
+                              backend))
              root-key (kons/get-root-key (:tree flushed))
-             tree (<?? (kons/create-tree-from-root-key store root-key))]
-         (is (= (<?? (msg/lookup tree -10)) nil))
-         (is (= (<?? (msg/lookup tree 100)) nil))
+             tree (ha/<?? (kons/create-tree-from-root-key store root-key))]
+         (is (= (ha/<?? (msg/lookup tree -10)) nil))
+         (is (= (ha/<?? (msg/lookup tree 100)) nil))
          (dotimes [i 10]
-           (is (= (<?? (msg/lookup tree (inc i))) (inc i))))
+           (is (= (ha/<?? (msg/lookup tree (inc i))) (inc i))))
          (is (= (map first (msg/lookup-fwd-iter tree 4)) (range 4 11)))
          (is (= (map first (msg/lookup-fwd-iter tree 0)) (range 1 11)))
-         (let [deleted (<?? (core/flush-tree (<?? (msg/delete tree 3)) backend))
+         (let [deleted (ha/<?? (core/flush-tree (ha/<?? (msg/delete tree 3)) backend))
                root-key (kons/get-root-key (:tree deleted))
-               tree (<?? (kons/create-tree-from-root-key store root-key))]
-           (is (= (<?? (msg/lookup tree 2)) 2))
-           (is (= (<?? (msg/lookup tree 3)) nil))
-           (is (= (<?? (msg/lookup tree 4)) 4)))
+               tree (ha/<?? (kons/create-tree-from-root-key store root-key))]
+           (is (= (ha/<?? (msg/lookup tree 2)) 2))
+           (is (= (ha/<?? (msg/lookup tree 3)) nil))
+           (is (= (ha/<?? (msg/lookup tree 4)) 4)))
          (delete-store folder)))))
 
 
-;; adapted from redis tests
+;; ;; adapted from redis tests
 
-(defn insert
-  [t k]
-  (msg/insert t k k))
+;; (defn insert
+;;   [t k]
+;;   (msg/insert t k k))
 
+;; (defn ops-test [ops universe-size]
+;;   (ha/go-try
+;;    (let [folder (str "/tmp/konserve-mixed-workload" (hasch/uuid))
+;;          _ #?(:clj (delete-store folder) :cljs nil)
+;;          store (kons/add-hitchhiker-tree-handlers
+;;                 (kc/ensure-cache
+;;                  #?(:clj (async/<!! (new-fs-store folder :config {:fsync false}))
+;;                     :cljs (async/<! (new-mem-store)))))
+;;          _ #?(:clj (assert (empty? (async/<!! (list-keys store)))
+;;                            "Start with no keys")
+;;               :cljs nil)
+;;                                         ;_ (swap! recorded-ops conj ops)
+;;          [b-tree root set]
+;;          (ha/<? (ha/reduce< (fn [[t root set] [op x]]
+;;                               (ha/go-try
+;;                                (let [x-reduced (when x (mod x universe-size))]
+;;                                  (case op
+;;                                    :flush (let [flushed (ha/<? (core/flush-tree t (kons/->KonserveBackend store)))
+;;                                                 t (:tree flushed)]
+;;                                             [t (ha/<? (:storage-addr t)) set])
+;;                                    :add [(ha/<? (insert t x-reduced)) root (conj set x-reduced)]
+;;                                    :del [(ha/<? (msg/delete t x-reduced)) root (disj set x-reduced)]))))
+;;                             [(ha/<? (core/b-tree (core/->Config 3 3 2))) nil #{}]
+;;                             ops))]
+;;      (let [b-tree-order (seq (map first (ha/<? (iter-helper b-tree -1))))
+;;            res (= b-tree-order (seq (sort set)))]
+;;        (assert res (str "These are unequal: " (pr-str b-tree-order) " " (pr-str (seq (sort set)))))
+;;        res))))
 
-(defn ops-test [ops universe-size]
-  (go-try
-   (let [folder (str "/tmp/konserve-mixed-workload" (hasch/uuid))
-         _ #?(:clj (delete-store folder) :cljs nil)
-         store (kons/add-hitchhiker-tree-handlers
-                (kc/ensure-cache
-                 #?(:clj (async/<!! (new-fs-store folder :config {:fsync false}))
-                   :cljs (async/<! (new-mem-store)))))
-         _ #?(:clj (assert (empty? (async/<!! (list-keys store)))
-                          "Start with no keys")
-             :cljs nil)
-                                        ;_ (swap! recorded-ops conj ops)
-         [b-tree root set]
-         (<? (core/reduce< (fn [[t root set] [op x]]
-                             (go-try
-                              (let [x-reduced (when x (mod x universe-size))]
-                                (condp = op
-                                  :flush (let [flushed (<? (core/flush-tree t (kons/->KonserveBackend store)))
-                                               t (:tree flushed)]
-                                           [t (<? (:storage-addr t)) set])
-                                  :add [(<? (insert t x-reduced)) root (conj set x-reduced)]
-                                  :del [(<? (msg/delete t x-reduced)) root (disj set x-reduced)]))))
-                           [(<? (core/b-tree (core/->Config 3 3 2))) nil #{}]
-                           ops))]
-     (let [b-tree-order (seq (map first (<? (iter-helper b-tree -1))))
-           res (= b-tree-order (seq (sort set)))]
-       (assert res (str "These are unequal: " (pr-str b-tree-order) " " (pr-str (seq (sort set)))))
-       res))))
-
-;; TODO recheck when https://dev.clojure.org/jira/browse/TCHECK-128 is fixed
-;; and share clj mixed-op-seq test, remove ops.cljc then.
-#?(:cljs
-   (deftest manual-mixed-op-seq
-     (async done
-            (go-try
-                (loop [[ops & r] recorded-ops]
-                  (when ops
-                    (is (<? (ops-test ops 1000)))
-                    (recur r)))
-              (done)))))
-
-
-#?(:clj
-   (defn mixed-op-seq
-     "This is like the basic mixed-op-seq tests, but it also mixes in flushes to a konserve filestore"
-     [add-freq del-freq flush-freq universe-size num-ops]
-     (prop/for-all [ops (gen/vector (gen/frequency
-                                     [[add-freq (gen/tuple (gen/return :add)
-                                                           (gen/no-shrink gen/int))]
-                                      [flush-freq (gen/return [:flush])]
-                                      [del-freq (gen/tuple (gen/return :del)
-                                                           (gen/no-shrink gen/int))]])
-                                    num-ops)]
-                   (<?? (ops-test ops universe-size)))))
+;; ;; TODO recheck when https://dev.clojure.org/jira/browse/TCHECK-128 is fixed
+;; ;; and share clj mixed-op-seq test, remove ops.cljc then.
+;; #?(:cljs
+;;    (deftest manual-mixed-op-seq
+;;      (async done
+;;             (ha/go-try
+;;              (loop [[ops & r] recorded-ops]
+;;                (when ops
+;;                  (is (ha/<? (ops-test ops 1000)))
+;;                  (recur r)))
+;;              (done)))))
 
 
-#?(:clj
-   (defspec test-many-keys-bigger-trees
-     100
-     (mixed-op-seq 800 200 10 1000 1000)))
+;; #?(:clj
+;;    (defn mixed-op-seq
+;;      "This is like the basic mixed-op-seq tests, but it also mixes in flushes to a konserve filestore"
+;;      [add-freq del-freq flush-freq universe-size num-ops]
+;;      (prop/for-all [ops (gen/vector (gen/frequency
+;;                                      [[add-freq (gen/tuple (gen/return :add)
+;;                                                            (gen/no-shrink gen/int))]
+;;                                       [flush-freq (gen/return [:flush])]
+;;                                       [del-freq (gen/tuple (gen/return :del)
+;;                                                            (gen/no-shrink gen/int))]])
+;;                                     num-ops)]
+;;                    (ha/<?? (ops-test ops universe-size)))))
 
 
-#?(:cljs
-   (defn ^:export test-all [cb]
-     (defmethod cljs.test/report [:cljs.test/default :end-run-tests] [m]
-       (cb (clj->js m))
-       (if (cljs.test/successful? m)
-         (println "Success!")
-         (println "FAIL")))
-     (run-tests)))
+;; #?(:clj
+;;    (defspec test-many-keys-bigger-trees
+;;      100
+;;      (mixed-op-seq 800 200 10 1000 1000)))
 
 
-
-
+;; #?(:cljs
+;;    (defn ^:export test-all [cb]
+;;      (defmethod cljs.test/report [:cljs.test/default :end-run-tests] [m]
+;;        (cb (clj->js m))
+;;        (if (cljs.test/successful? m)
+;;          (println "Success!")
+;;          (println "FAIL")))
+;;      (run-tests)))

@@ -3,21 +3,21 @@
 
   It provides a visualization similar to those in https://youtu.be/jdn617M3-P4?t=1583
   "
-  (:require [konserve.memory :refer [new-mem-store]]
-            [hitchhiker.konserve :as kons]
-            [konserve.cache :as kc]
-            [hitchhiker.tree.core :refer [<?? <? go-try] :as core]
-            [hitchhiker.tree.messaging :as msg]
-            [clojure.core.async :refer [promise-chan] :as async]
-            [clojure.string :as str]
-
-            [loom.io :refer [view] :as lio]
-            [loom.graph :refer [graph] :as lg]
-            [loom.derived :as deriv]
-            [loom.attr :as attr]
-
-            [cheshire.core :as json]))
-
+  (:require
+   [konserve.memory :refer [new-mem-store]]
+   [hitchhiker.tree.bootstrap.konserve :as kons]
+   [konserve.cache :as kc]
+   [hitchhiker.tree :as tree]
+   [hitchhiker.tree.node :as n]
+   [hitchhiker.tree.utils.async :as ha]
+   [hitchhiker.tree.messaging :as msg]
+   [clojure.core.async  :as async]
+   [clojure.string :as str]
+   [loom.io :refer [view] :as lio]
+   [loom.graph :refer [graph] :as lg]
+   [loom.derived :as deriv]
+   [loom.attr :as attr]
+   [cheshire.core :as json]))
 
 ;; patch loom for compass rendering
 (ns loom.io)
@@ -58,7 +58,7 @@
             el (edge-label n1 n2)
             eattrs (assoc (if a?
                             (attrs g n1 n2) {})
-                     :label el)]
+                          :label el)]
         (doto sb
           (.append "  \"")
           (.append (dot-esc n1l))
@@ -89,69 +89,65 @@
 
 (ns hitchhiker.plot)
 
-(def store (kons/add-hitchhiker-tree-handlers
-            (kc/ensure-cache (async/<!! (new-mem-store)))) )
+(def store
+  (kons/add-hitchhiker-tree-handlers
+   (kc/ensure-cache (async/<!! (new-mem-store)))) )
 
 
 ;; put a tree in the store including merkle hashes
-(def flushed (<?? (core/flush-tree
-                   (time (reduce (fn [t i]
-                                   (<?? (msg/insert t i i)))
-                                 (<?? (core/b-tree (core/->Config 3 3 2)))
-                                 (shuffle (range 1 30))))
-                   (kons/->KonserveBackend store))))
+(def flushed
+  (ha/<?? (tree/flush-tree
+           (time (reduce (fn [t i]
+                           (ha/<?? (msg/insert t i i)))
+                         (ha/<?? (tree/b-tree (tree/->Config 3 3 2)))
+                         (shuffle (range 1 30))))
+           (kons/->KonserveBackend store))))
 
 
-(def flushed (<?? (core/flush-tree
-                   (time (reduce (fn [t i]
-                                   (<?? (msg/insert t i i)))
-                                 (:tree flushed)
-                                 (shuffle (range -4 -2))))
-                   (kons/->KonserveBackend store))))
+(def flushed
+  (ha/<?? (tree/flush-tree
+           (time (reduce (fn [t i]
+                           (ha/<?? (msg/insert t i i)))
+                         (:tree flushed)
+                         (shuffle (range -4 -2))))
+           (kons/->KonserveBackend store))))
 
 
 
 (comment
   ;; TODO double root node?
-
   (do
     (def store (kons/add-hitchhiker-tree-handlers
                 (kc/ensure-cache (async/<!! (new-mem-store)))) )
 
 
     ;; insertion
-    (def flushed (<?? (core/flush-tree
-                       (time (reduce (fn [t i]
-                                       (<?? (msg/insert t i i)))
-                                     (<?? (core/b-tree (core/->Config 2 2 2)))
-                                     (concat (range 1 12)
-                                             #_[0 13 14 -1 15])))
-                       (kons/->KonserveBackend store))))
+    (def flushed (ha/<?? (tree/flush-tree
+                          (time (reduce (fn [t i]
+                                          (ha/<?? (msg/insert t i i)))
+                                        (ha/<?? (tree/b-tree (tree/->Config 2 2 2)))
+                                        (concat (range 1 12)
+                                                #_[0 13 14 -1 15])))
+                          (kons/->KonserveBackend store))))
 
 
-    (def flushed (<?? (core/flush-tree
-                       (time (reduce (fn [t i]
-                                       (<?? (msg/insert t i i)))
-                                     (:tree flushed)
-                                     (range 12 14)))
-                       (kons/->KonserveBackend store))))
+    (def flushed (ha/<?? (tree/flush-tree
+                          (time (reduce (fn [t i]
+                                          (ha/<?? (msg/insert t i i)))
+                                        (:tree flushed)
+                                        (range 12 14)))
+                          (kons/->KonserveBackend store))))
 
-    (view (create-graph store))
-
-    )
-
-
-  )
-
+    (view (create-graph store))))
 
 (defn init-graph [store]
   (apply lg/digraph
          (->> @(:state store)
-            (filter (fn [[id {:keys [children]}]] children))
-            (map (fn [[id {:keys [children] :as node}]]
-                   (if (:op-buf node)
-                     {id (mapv (fn [c] (:konserve-key c)) children)}
-                     {id []}))))))
+              (filter (fn [[id {:keys [children]}]] children))
+              (map (fn [[id {:keys [children] :as node}]]
+                     (if (:op-buf node)
+                       {id (mapv (fn [c] (:konserve-key c)) children)}
+                       {id []}))))))
 
 
 (defn use-record-nodes [g]
@@ -159,15 +155,15 @@
 
 
 (defn node-layout [g [id {:keys [children] :as node}]]
-  (if (core/index-node? node)
+  (if (tree/index-node? node)
     (attr/add-attr
      g id
      :label (str
              ;; key space separators
              (str/join " | "
-                           (map #(str "<" % "> " ;; compass point (invisible)
-                                     "\\<" % "\\>")
-                                (map core/last-key (:children node))))
+                       (map #(str "<" % "> " ;; compass point (invisible)
+                                  "\\<" % "\\>")
+                            (map n/-last-key (:children node))))
              ;; render op-log
              " | {"
              (str/join " | " (map (fn [{:keys [key value]}]
@@ -181,8 +177,8 @@
 
 (defn set-node-layouts [g store]
   (->> @(:state store)
-     (filter (fn [[id {:keys [children]}]] children))
-     (reduce node-layout g)))
+       (filter (fn [[id {:keys [children]}]] children))
+       (reduce node-layout g)))
 
 (defn edge-hash [id]
   (-> id str (subs 0 4)))
@@ -192,21 +188,21 @@
         edges (lg/edges g)]
     (reduce
      (fn [g [n1 n2]]
-       (let [h (:konserve-key (clojure.core.async/<!!
+       (let [h (:konserve-key (async/<!!
                                (:storage-addr (into {} (node-map n2)))))]
          (-> g
-            (attr/add-attr-to-edges :compass (core/last-key (node-map n2))
-                                    [[n1 n2]])
-            (attr/add-attr-to-edges :label (edge-hash h) [[n1 n2]]))))
+             (attr/add-attr-to-edges :compass (n/-last-key (node-map n2))
+                                     [[n1 n2]])
+             (attr/add-attr-to-edges :label (edge-hash h) [[n1 n2]]))))
      g
      edges)))
 
 
 (defn create-graph [store]
   (-> (init-graph store)
-     use-record-nodes
-     (set-node-layouts store)
-     (set-edge-layouts store)))
+      use-record-nodes
+      (set-node-layouts store)
+      (set-edge-layouts store)))
 
 
 
@@ -218,12 +214,12 @@
 
 
 (defn remove-storage-addrs [[k v]]
-  (if (core/index-node? v)
+  (if (tree/index-node? v)
     [k (-> v
-          (dissoc :storage-addr :cfg)
-          (update :children (fn [cs] (mapv #(dissoc % :storage-addr :store) cs)))
-          (update :op-buf (fn [cs] (mapv #(into {} %) cs)))
-          )]
+           (dissoc :storage-addr :cfg)
+           (update :children (fn [cs] (mapv #(dissoc % :storage-addr :store) cs)))
+           (update :op-buf (fn [cs] (mapv #(into {} %) cs)))
+           )]
     [k (dissoc v :storage-addr :cfg)]))
 
 
@@ -234,11 +230,3 @@
 
 
   (prn (map remove-storage-addrs @(:state store))))
-
-
-
-
-
-
-
-

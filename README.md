@@ -29,7 +29,7 @@ it can accept transactions, provide snapshots for querying, and be cloned.
 ### API Usage Example
 
 ```clojure
-(require '[hitchhiker.outboard :as ob])
+(require '[hitchhiker.tree.bootstrap.outboard :as ob])
 
 ;; First, we'll create a connection to a new outboard
 (def my-outboard (ob/create "first-outboard-tree"))
@@ -96,8 +96,8 @@ Details about hitchhiker trees, including related work, can be found in `docs/hi
 
 ## Testing
 
-You'l need a local Redis instance running to run the tests. Once you have it, just run  
- 
+You'l need a local Redis instance running to run the tests. Once you have it, just run
+
     lein test
 
 
@@ -137,12 +137,6 @@ If you'd like to see the options for the benchmarking tool, just run `lein bench
 ## Technical details
 
 See the `doc/` folder for technical details of the hitchhiker tree and Redis garbage collection system.
-
-### Async support
-
-We have preliminary async support that has to be selected before macro expansion
-time by setting `hitchhiker.tree.async/*async-backend*` either to `:none` or
-`:core.async`.
 
 ## Gratitude
 

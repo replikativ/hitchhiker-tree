@@ -1,0 +1,91 @@
+* General
+** TODO Comparative benchmark modes--apples to apples (by params) and everything vs. one trial
+   This will help guide optimization work
+** TODO Figure out where the huge spikes in operation time come from (tiered resizing?)
+** TODO We need a more thorough set of tests for the messaging system to saturate deletes, to ensure we don't have more lurking bugs
+** TODO Implementations of backwards scan, pred, and succ
+** TODO Write the WAL, back with in-mem and redis, then add to benchmarks.
+   This is necessary for disk-backed work
+** TODO Choose splits and sizes based on serialized results--big perf gain
+** TODO benchmark dataset like (map + (repeatedly rand) (iterate #(+ 0.01 %) 0.0))
+   that's a sliding random window, for some random moving write heavy region
+   with lots of cold nodes
+** TODO Add async writes
+** TODO Make a snapshot life-extender
+** TODO Add support for datascript
+
+* hitchhiker.tree
+** TODO how to track dirty bits
+** TODO maybe this is a good protocol?
+   could model w/ monad (ground state dirty unless loaded from storage),
+   gets cleaned after each flush-flood
+   flush-flood is the BFS for all dirty nodes; individual nodes must be flushable
+   A storage backend must be able to take a node as arg, serialize, assign addr,
+   and call "clean" on the node to allow it to have a backing addr
+
+   Maybe disk backing shouldn't be done as a monad, since that woud double
+   the total IOPS when 2 users of a snapshot need flush/clones
+   (N uses makes N useless copies).
+
+   So perhaps each node can have a promise, it's address on storage.
+   When someone wants to flush it, they first dump it to disk, then try to clean it.
+   If the clean succeeds, they're done. If the clean fails (i.e. deliver fails),
+   they roll back the write and read the address from the promise.
+
+   Monads will be reserved for things we want persisted, rather than the
+   in-memory flushing system, which can afford extra communication
+
+   We can totally rely on a caching layer to manage keeping nodes around for
+   when a single tree is passed to several different consumers. This layer
+   will make it easier ta manage the overall JVM's memory allocation, and
+   it's far simpler than trying to use weak pointers to track unresolved addrs
+   so that we can supply the data to all of them when we fetch it. The cache
+   will also have better GC properties, by not accidentally sticking random
+   tree bits into jvm GC roots that could be held a long time.
+
+   So flushing writes are shared, but loading from disk is cached instead.
+   Maybe write flushing could itself just be a smaller (or bigger) "write cache"...
+   no, that could be defeated by really big writes, which are already guaranteed
+   to be resident (since they were pending and thus linked to the tree's root).
+
+   We'll make an IOPS measuring backend, which specifically makes "fake" addrs
+   that keep pointers to the nodes they "stored". Importantly, it needs to record
+   each read and write operation into counters, so that we can run a test
+   and check the total IOPS we spent.
+
+   The advanced work with this will allow us to define hard IOPS bounds
+   (based on proven data), and then send generated loads to check we stay within
+   our targets.
+** TODO add full edn support including records
+** TODO enforce that there always (= (count children) (inc (count keys)))
+** TODO we should be able to find all uncommited data by searching for resolved & unresolved children
+
+* hitchhiker.tree.messaging
+** TODO delete in core needs to stop using the index-node constructor to be more
+   careful about how we handle op-bufs during splits and merges.
+** TODO After we've got delete working, lookup, pred, and succ should be fixed
+   broadcast nodes will need IDs so that they can combine during merges...
+
+* hitchhiker.tree.node
+** TODO resolve should be instrumented
+
+* hitchhiker.tree.bootstrap.redis
+** TODO test expiration stuff
+
+* hitchhiker.tree.codec.nippy
+** TODO apparently RRB-vectors don't freeze correctly
+   We could teach nippy to do so and avoid copying on a regular vector
+   like now
+
+* hitchhiker.tree.bootstrap.konserve
+** TODO get-root-key: figure out why it's inconsistent
+
+* hitchhiker.tree.bootstrap.outboard
+** TODO safer destroy/create
+   Should have a global reg of opened outboards to prevent
+   double-opening or destroynig while in use
+** TODO update!
+   should return the before & after tree states as pointers
+
+* hitchhiker.tree.core-test
+** TODO should test that flushing can be interleaved without races

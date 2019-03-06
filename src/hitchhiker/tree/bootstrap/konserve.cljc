@@ -1,0 +1,172 @@
+(ns hitchhiker.tree.bootstrap.konserve
+  (:refer-clojure :exclude [subvec])
+  (:require
+   [clojure.core.rrb-vector :refer [catvec subvec]]
+   [konserve.cache :as k]
+   [konserve.memory :refer [new-mem-store]]
+   [hasch.core :as h]
+   [clojure.set :as set]
+   [hitchhiker.tree.messaging :as msg]
+   [hitchhiker.tree :as tree]
+   [hitchhiker.tree.node :as n]
+   [hitchhiker.tree.backend :as b]
+   [hitchhiker.tree.key-compare :as c]
+   [hitchhiker.tree.utils.async :as ha]
+   [hitchhiker.tree.codec.nippy :as nippy]
+   #?@(:clj [[clojure.core.async :as async]
+             [clojure.core.cache :as cache]]
+       :cljs [[cljs.core.async :include-macros true :as async]
+              [cljs.cache :as cache]])))
+
+(declare encode)
+
+(defn nilify
+  [m ks]
+  (reduce (fn [m k] (assoc m k nil))
+          m
+          ks))
+
+(defn encode-index-node
+  [node]
+  (-> node
+      (nilify [:resolve-ch :storage-addr :*last-key-cache])
+      (assoc :children (mapv encode (:children node)))))
+
+(defn encode-data-node
+  [node]
+  (nilify node
+          [:resolve-ch
+           :storage-addr
+           :*last-key-cache]))
+
+(defn encode-address
+  [node]
+  (nilify node
+          [:store
+           :storage-addr
+           :resolve-ch
+           :*resolve-state]))
+
+(defn encode
+  [node]
+  (cond
+    (tree/index-node? node) (encode-index-node node)
+    (tree/data-node? node) (encode-data-node node)
+    (tree/address? node) (encode-address node)
+    :else node))
+
+(defn synthesize-storage-address
+  "Given a key, returns a promise containing that key for use as a storage-addr"
+  [key]
+  (ha/promise-chan key))
+
+(defrecord KonserveAddr [store last-key konserve-key storage-addr
+                         resolve-ch
+                         *resolve-state]
+  n/INode
+  (-last-key [_] last-key)
+
+  n/IAddress
+  (-dirty? [_] false)
+  (-dirty! [this]
+    ;; (assoc this
+    ;;        :resolve-ch (async/promise-chan)
+    ;;        :*resolve-state (atom ::init)
+    ;;        :storage-addr (async/promise-chan))
+    this)
+  (-resolve-chan [this]
+    ;; make sure we don't have a pending resolve in progress before
+    ;; triggering it
+    (when (compare-and-set! *resolve-state
+                            ::init
+                            ::pending)
+      (ha/go-try
+       (ha/>! resolve-ch
+              ;; inline konserve cache resolution
+              (let [cache (:cache store)]
+                (if-let [v (cache/lookup @cache konserve-key)]
+                  (do (swap! cache cache/hit konserve-key)
+                      (assoc v :storage-addr (synthesize-storage-address konserve-key)))
+                  (let [ch (k/get-in store [konserve-key])]
+                    (-> (ha/<? ch)
+                        (assoc :storage-addr (synthesize-storage-address konserve-key)))))))
+       (reset! *resolve-state ::resolved)))
+    resolve-ch))
+
+(defn konserve-addr
+  [store last-key konserve-key]
+  (->KonserveAddr store
+                  last-key
+                  konserve-key
+                  (ha/promise-chan konserve-key)
+                  (async/promise-chan)
+                  (atom ::init)))
+
+(defrecord KonserveBackend [store]
+  b/IBackend
+  (-new-session [_] (atom {:writes 0 :deletes 0}))
+  (-anchor-root [_ {:keys [konserve-key] :as node}]
+    node)
+  (-write-node [_ node session]
+    (ha/go-try
+     (swap! session update-in [:writes] inc)
+     (let [pnode (encode node)
+           id (h/uuid pnode)
+           ch (k/assoc-in store [id] node)]
+       (ha/<? ch)
+       (konserve-addr store
+                      (n/-last-key node)
+                      id))))
+  (-delete-addr [_ addr session]
+    (swap! session update :deletes inc)))
+
+(defn get-root-key
+  [tree]
+  (or
+   (-> tree :storage-addr (async/poll!) :konserve-key)
+   (-> tree :storage-addr (async/poll!))))
+
+(defn create-tree-from-root-key
+  [store root-key]
+  (ha/go-try
+   (let [val (ha/<? (k/get-in store [root-key]))
+         ;; need last key to bootstrap
+         last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
+     (ha/<? (n/-resolve-chan (konserve-addr store
+                                            last-key
+                                            root-key))))))
+
+(defn add-hitchhiker-tree-handlers [store]
+  (nippy/ensure-installed!)
+  (swap! (:read-handlers store)
+         merge
+         {'hitchhiker.tree.bootstrap.konserve.KonserveAddr
+          (fn [{:keys [last-key konserve-key]}]
+            (konserve-addr store
+                           last-key
+                           konserve-key))
+          'hitchhiker.tree.DataNode
+          (fn [{:keys [children cfg] :as d}]
+            (tree/data-node (into (sorted-map-by c/-compare)
+                                  children)
+                            cfg))
+          'hitchhiker.tree.IndexNode
+          (fn [{:keys [children cfg op-buf]}]
+            (tree/index-node (vec children)
+                             (vec op-buf)
+                             cfg))
+          'hitchhiker.tree.messaging.InsertOp
+          msg/map->InsertOp
+          'hitchhiker.tree.messaging.DeleteOp
+          msg/map->DeleteOp
+          'hitchhiker.tree.Config
+          tree/map->Config})
+  (swap! (:write-handlers store)
+         merge
+         {'hitchhiker.tree.bootstrap.konserve.KonserveAddr
+          encode-address
+          'hitchhiker.tree.DataNode
+          encode-data-node
+          'hitchhiker.tree.IndexNode
+          encode-index-node})
+  store)

@@ -1,51 +1,54 @@
-(ns hitchhiker.redis
-  (:require [clojure.core.cache :as cache]
-            [clojure.string :as str]
-            [hitchhiker.tree.core :refer [go-try <? <??] :as core]
-            [clojure.core.async :refer [promise-chan put!]]
-            [hitchhiker.tree.messaging :as msg]
-            [taoensso.carmine :as car :refer [wcar]]
-            [taoensso.nippy :as nippy]
-            [clojure.core.async :as async]))
+(ns hitchhiker.tree.bootstrap.redis
+  "Description of refcounting system in redis
 
-;;; Description of refcounting system in redis
-;;;
-;;; The refcounting system allows any key in redis to be managed
-;;; by refcounting. This refcounter doesn't do cycle protection, but
-;;; weakrefs would be very simple to add.
-;;;
-;;; To have a key point to another, we call add-refs with the pointer key
-;;; and list of pointee keys. Usually, the pointer key would be a struct
-;;; with children.
-;;;
-;;; Each key which is pointed to has an auxiliary key, which has the same name
-;;; but ends in :rc. This is an int of the refcount of the key; the system
-;;; deletes the key when its refcount reaches 0.
-;;;
-;;; Each key which is a pointer has an auxiliary key, which has the same name
-;;; but ends in :rl. This is the list of keys that we have a reference, or pointer, to.
-;;; rl=reflist. This list is used when the pointer is finally deleted--every
-;;; key which the pointer points to must have its refcount decremented, and if
-;;; any refcount reaches 0, that key must too be deleted.
-;;;
-;;; To reduce the frequency that keys are orphaned, we allow for new roots to
-;;; be marked by the new-root function. This function stores the given key as a
-;;; newly created root pointer, which is put onto a list with its creation time.
-;;; Somehow, we track when root pointers are older than a certain time, so that
-;;; we can delete them automatically.
+  The refcounting system allows any key in redis to be managed
+  by refcounting. This refcounter doesn't do cycle protection, but
+  weakrefs would be very simple to add.
+
+  To have a key point to another, we call add-refs with the pointer key
+  and list of pointee keys. Usually, the pointer key would be a struct
+  with children.
+
+  Each key which is pointed to has an auxiliary key, which has the same name
+  but ends in :rc. This is an int of the refcount of the key; the system
+  deletes the key when its refcount reaches 0.
+
+  Each key which is a pointer has an auxiliary key, which has the same name
+  but ends in :rl. This is the list of keys that we have a reference, or pointer, to.
+  rl=reflist. This list is used when the pointer is finally deleted--every
+  key which the pointer points to must have its refcount decremented, and if
+  any refcount reaches 0, that key must too be deleted.
+
+  To reduce the frequency that keys are orphaned, we allow for new roots to
+  be marked by the new-root function. This function stores the given key as a
+  newly created root pointer, which is put onto a list with its creation time.
+  Somehow, we track when root pointers are older than a certain time, so that
+  we can delete them automatically."
+  (:require
+   [clojure.core.cache :as cache]
+   [clojure.string :as str]
+   [hitchhiker.tree.utils.async :as ha]
+   [hitchhiker.tree :as tree]
+   [hitchhiker.tree.node :as n]
+   [hitchhiker.tree.op :as op]
+   [hitchhiker.tree.backend :as b]
+   [hitchhiker.tree.codec.nippy :as hn]
+   [clojure.core.async :refer [promise-chan] :as async]
+   [hitchhiker.tree.messaging :as msg]
+   [taoensso.carmine :as car :refer [wcar]]
+   [taoensso.nippy :as nippy]))
 
 (defn add-refs
   [node-key children-keys]
-  ;(println "Adding refs" node-key children-keys)
   (apply car/eval*
          (str/join
-           \newline
-           ["local parent = ARGV[1]"
-            "for i=2,#ARGV do"
-            "  local child = ARGV[i]"
-            "  redis.call('incr', child .. ':rc')"
-            "  redis.call('rpush', parent .. ':rl', child)"
-            "end"])
+          \newline
+          ["local parent = ARGV[1]"
+           "for i=2,#ARGV do"
+           "  local child = ARGV[i]"
+           "  redis.call('incr', child .. ':rc')"
+           "  redis.call('rpush', parent .. ':rl', child)"
+           "end"])
          0
          node-key
          children-keys))
@@ -75,7 +78,6 @@
   (car/lua (str drop-ref-lua "\ndrop_ref(_:my-key)")
            {} {:my-key key}))
 
-;;TODO test the exiration stuff
 (defn get-next-expiry
   "Given the current time, returns the next expiry time"
   [now]
@@ -97,7 +99,7 @@
                       "  end"
                       "  return time_to_sleep"
                       "end"])
-             {} {:now now}))
+           {} {:now now}))
 
 (defn start-expiry-thread!
   []
@@ -132,57 +134,62 @@
   (defn totally-fetch
     [redis-key]
     (let [run (delay
-                (loop [i 0]
-                  (if (= i 1000)
-                    (do (println "total fail") (throw (ex-info "total fail" {:key redis-key})))
-                    (let [x (wcar {} (car/get redis-key))]
-                      (if x
-                        x
-                        (do (Thread/sleep 25) (recur (inc i))))))))
+               (loop [i 0]
+                 (if (= i 1000)
+                   (do (println "total fail") (throw (ex-info "total fail" {:key redis-key})))
+                   (let [x (wcar {} (car/get redis-key))]
+                     (if x
+                       x
+                       (do (Thread/sleep 25) (recur (inc i))))))))
           cs (swap! cache (fn [c]
                             (if (cache/has? c redis-key)
                               (cache/hit c redis-key)
                               (cache/miss c redis-key run))))
           val (cache/lookup cs redis-key)]
-      (if val (<?? val) @run)))
+      (if val (ha/<?? val) @run)))
 
   (defn seed-cache!
     [redis-key val]
     (swap! cache cache/miss redis-key val)))
 
 #_(def totally-fetch
-  (memo/lru (fn [redis-key]
-              (loop [i 0]
-                (if (= i 1000)
-                  (do (println "total fail") (System/exit 1))
-                  (let [x (wcar {} (car/get redis-key))]
-                    (if x
-                      x
-                      (do (Thread/sleep 25) (recur (inc i))))))))
-            :lru/threshold 400))
+    (memo/lru (fn [redis-key]
+                (loop [i 0]
+                  (if (= i 1000)
+                    (do (println "total fail") (System/exit 1))
+                    (let [x (wcar {} (car/get redis-key))]
+                      (if x
+                        x
+                        (do (Thread/sleep 25) (recur (inc i))))))))
+              :lru/threshold 400))
 
 (defn synthesize-storage-addr
   "Given a key, returns a promise containing that key for use as a storage-addr"
   [key]
   (doto (promise-chan)
-    (put! key)))
+    (async/offer! key)))
 
-(defrecord RedisAddr [last-key redis-key storage-addr]
-  core/IResolve
-  (dirty? [_] false)
-  (last-key [_] last-key)
-  (resolve [_]
-    (go-try (-> (totally-fetch redis-key)
-                (assoc :storage-addr (synthesize-storage-addr redis-key))))))
+(defrecord RedisAddr [last-key
+                      redis-key
+                      storage-addr]
+  n/IAddress
+  (-dirty? [_] false)
+  (-resolve-chan [_]
+    (ha/go-try (-> (totally-fetch redis-key)
+                   (assoc :storage-addr (synthesize-storage-addr redis-key)))))
+
+  n/INode
+  (-last-key [_] last-key))
 
 (comment
   (:cfg (wcar {} (car/get "b89bb965-e584-45a2-9232-5b76bf47a21c")))
-  (update-in {:op-buf [1 2 3]} [:op-buf] into [4 5 6])
-  )
+  (update-in {:op-buf [1 2 3]} [:op-buf] into [4 5 6]))
 
 (defn redis-addr
   [last-key redis-key]
   (->RedisAddr last-key redis-key (synthesize-storage-addr redis-key)))
+
+(hn/ensure-installed!)
 
 (nippy/extend-freeze RedisAddr :b-tree/redis-addr
                      [{:keys [last-key redis-key]} data-output]
@@ -195,34 +202,33 @@
                          redis-key (nippy/thaw-from-in! data-input)]
                      (redis-addr last-key redis-key)))
 
-
 (defrecord RedisBackend [#_service]
-  core/IBackend
-  (new-session [_] (atom {:writes 0
-                          :deletes 0}))
-  (anchor-root [_ {:keys [redis-key] :as node}]
+  b/IBackend
+  (-new-session [_] (atom {:writes 0
+                           :deletes 0}))
+  (-anchor-root [_ {:keys [redis-key] :as node}]
     (wcar {} (add-to-expiry redis-key (+ 5000 (System/currentTimeMillis))))
     node)
-  (write-node [_ node session]
-    (go-try
+  (-write-node [_ node session]
+    (ha/go-try
      (swap! session update-in [:writes] inc)
      (let [key (str (java.util.UUID/randomUUID))
-           addr (redis-addr (core/last-key node) key)]
+           addr (redis-addr (n/-last-key node) key)]
                                         ;(.submit service #(wcar {} (car/set key node)))
-       (when (some #(not (satisfies? msg/IOperation %)) (:op-buf node))
+       (when (some #(not (satisfies? op/IOperation %)) (:op-buf node))
          (println (str "Found a broken node, has " (count (:op-buf node)) " ops"))
          (println (str "The node data is " node))
          (println (str "and " (:op-buf node))))
        (wcar {}
              (car/set key node)
-             (when (core/index-node? node)
+             (when (tree/index-node? node)
                (add-refs key
                          (for [child (:children node)
-                               :let [child-key (<?? (:storage-addr child))]]
+                               :let [child-key (ha/<?? (:storage-addr child))]]
                            child-key))))
-       (seed-cache! key (doto (promise-chan) (put! node)))
+       (seed-cache! key (ha/go-try node))
        addr)))
-  (delete-addr [_ addr session]
+  (-delete-addr [_ addr session]
     (wcar {} (car/del addr))
     (swap! session update-in :deletes inc)))
 
@@ -230,19 +236,19 @@
   [tree]
   (-> tree :storage-addr (async/poll!)))
 
-
 (defn create-tree-from-root-key
   [root-key]
-  (let [last-key (core/last-key (wcar {} (car/get root-key)))] ; need last key to bootstrap
-    (<?? (core/resolve
-          (->RedisAddr last-key root-key (synthesize-storage-addr root-key))))))
+  (let [last-key (n/-last-key (wcar {} (car/get root-key)))] ; need last key to bootstrap
+    (-> (->RedisAddr last-key root-key (synthesize-storage-addr root-key))
+        n/-resolve-chan
+        ha/<??)))
 
 (comment
   (wcar {} (car/ping) (car/set "foo" "bar") (car/get "foo"))
 
-(println "cleared"
-         (wcar {} (apply car/del
-                         (count (wcar {} (car/keys "*")))))))
+  (println "cleared"
+           (wcar {} (apply car/del
+                           (count (wcar {} (car/keys "*")))))))
 
 ;; Benchmarks:
 ;; We'll have 2 workloads: in-order (the natural numbers) and random (doubles in 0-1)
@@ -261,20 +267,20 @@
 ;;
 (comment
 
-(do
-  (wcar {}
-      (doseq [k ["foo" "bar" "baz" "quux"]
-              e ["" ":rc" ":rs" ":rl"]]
-        (car/del (str k e))))
+  (do
+    (wcar {}
+          (doseq [k ["foo" "bar" "baz" "quux"]
+                  e ["" ":rc" ":rs" ":rl"]]
+            (car/del (str k e))))
 
-  (do (wcar {} (car/set "foo" 22))
-      ;(wcar {} (car/set "foo:rc" 1))
-      (wcar {} (car/set "bar" 33))
-      (wcar {} (car/set "baz" "onehundred"))
-      (wcar {} (car/set "quux" "teply"))
-      (wcar {} (add-refs "baz" ["quux"]))
-      (wcar {} (add-refs "foo" ["bar" "baz"])))
-  (wcar {} (drop-ref "foo")))
+    (do (wcar {} (car/set "foo" 22))
+                                        ;(wcar {} (car/set "foo:rc" 1))
+        (wcar {} (car/set "bar" 33))
+        (wcar {} (car/set "baz" "onehundred"))
+        (wcar {} (car/set "quux" "teply"))
+        (wcar {} (add-refs "baz" ["quux"]))
+        (wcar {} (add-refs "foo" ["bar" "baz"])))
+    (wcar {} (drop-ref "foo")))
   (doseq [k ["foo" "bar" "baz" "quux"]
           e ["" ":rc" ":rs" ":rl"]]
     (println (str k e) "=" (wcar {} ((if (= e ":rl")
@@ -286,23 +292,20 @@
 
   (wcar {} (car/flushall))
   (count (wcar {} (car/keys "*")))
-  (count (msg/lookup-fwd-iter (create-tree-from-root-key (<? (:storage-addr (:tree my-tree)))) -1))
-  (count (msg/lookup-fwd-iter (create-tree-from-root-key (<? (:storage-addr (:tree my-tree-updated)))) -1))
-  (def my-tree (core/flush-tree
-                 (time (reduce msg/insert
-                               (core/b-tree (core/->Config 17 300 (- 300 17)))
-                               (range 50000)))
-                 (->RedisBackend)
-                 ))
+  (count (tree/lookup-fwd-iter (create-tree-from-root-key (<? (:storage-addr (:tree my-tree)))) -1))
+  (count (tree/lookup-fwd-iter (create-tree-from-root-key (<? (:storage-addr (:tree my-tree-updated)))) -1))
+  (def my-tree (tree/flush-tree
+                (time (reduce msg/insert
+                              (tree/b-tree (tree/->Config 17 300 (- 300 17)))
+                              (range 50000)))
+                (->RedisBackend)))
   (def my-tree-updated (core/flush-tree
-                         (msg/delete (:tree my-tree) 10)
-                         (->RedisBackend)
-                         ))
+                        (msg/delete (:tree my-tree) 10)
+                        (->RedisBackend)))
   (wcar {} (car/get (str @(:storage-addr (:tree my-tree)))))
   (wcar {} (car/get (str @(:storage-addr (:tree my-tree-updated)))))
   (wcar {} (car/set "foo" 10))
   (wcar {} (car/get "foo"))
   (wcar {} (drop-ref "foo"))
   (wcar {} (drop-ref @(:storage-addr (:tree my-tree))))
-  (wcar {} (drop-ref @(:storage-addr (:tree my-tree-updated))))
-  )
+  (wcar {} (drop-ref @(:storage-addr (:tree my-tree-updated)))))

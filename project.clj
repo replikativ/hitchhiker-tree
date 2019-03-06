@@ -28,7 +28,7 @@
                                   ;; plotting
                                   [aysylu/loom "1.0.2"]
                                   [cheshire "5.8.1"]]
-                   :source-paths ["src" "dev"]
+                   :source-paths ["src" "dev" "test"]
                    :plugins [[lein-figwheel "0.5.18"]]
                    :repl-options {; for nREPL dev you really need to limit output
                                   :init (set! *print-length* 50)}}}
