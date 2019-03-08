@@ -9,8 +9,7 @@
    [hasch.core :as h]
    [hitchhiker.tree :as tree :include-macros true]
    #?@(:clj [[clojure.core.async :as async]]
-       :cljs [[cljs.core.async :as async]]))
-  #?(:clj (:import (java.io Writer))))
+       :cljs [[cljs.core.async :as async]])))
 
 (defrecord InsertOp [key value]
   op/IOperation
@@ -210,16 +209,16 @@
           (ha/chan-seq iter-ch)))))
  ;; else
  (do
-   (defn forward-iterator
-     "Takes the result of a search and returns an iterator going
+  (defn forward-iterator
+      "Takes the result of a search and returns an iterator going
    forward over the tree. Does lg(n) backtracking sometimes."
-     [path]
-     (assert (tree/data-node? (peek path)))
-     (let [first-elements (apply-ops-in-path path)
-           next-elements (lazy-seq
-                          (when-let [succ (tree/right-successor (pop path))]
-                            (forward-iterator succ)))]
-       (concat first-elements next-elements)))
+      [path]
+      (assert (tree/data-node? (peek path)))
+      (let [first-elements (apply-ops-in-path path)
+            next-elements (lazy-seq
+                           (when-let [succ (tree/right-successor (pop path))]
+                             (forward-iterator succ)))]
+        (concat first-elements next-elements)))
 
 
    (defn lookup-fwd-iter

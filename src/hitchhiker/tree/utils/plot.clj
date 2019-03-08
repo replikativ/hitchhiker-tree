@@ -1,4 +1,4 @@
-(ns hitchhiker.plot
+(ns hitchhiker.tree.utils.plot
   "This namespace provides functions to help visualizing hh-trees.
 
   It provides a visualization similar to those in https://youtu.be/jdn617M3-P4?t=1583
@@ -87,12 +87,11 @@
     (str (doto sb (.append "}")))))
 
 
-(ns hitchhiker.plot)
+(ns hitchhiker.tree.utils.plot)
 
 (def store
   (kons/add-hitchhiker-tree-handlers
-   (kc/ensure-cache (async/<!! (new-mem-store)))) )
-
+   (kc/ensure-cache (async/<!! (new-mem-store)))))
 
 ;; put a tree in the store including merkle hashes
 (def flushed
@@ -118,7 +117,7 @@
   ;; TODO double root node?
   (do
     (def store (kons/add-hitchhiker-tree-handlers
-                (kc/ensure-cache (async/<!! (new-mem-store)))) )
+                (kc/ensure-cache (ha/<?? (new-mem-store)))) )
 
 
     ;; insertion

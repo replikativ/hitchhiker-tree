@@ -52,7 +52,7 @@
   (cond
     (tree/index-node? node) (encode-index-node node)
     (tree/data-node? node) (encode-data-node node)
-    (tree/address? node) (encode-address node)
+    (n/address? node) (encode-address node)
     :else node))
 
 (defn synthesize-storage-address
@@ -81,16 +81,16 @@
                             ::init
                             ::pending)
       (ha/go-try
-       (ha/>! resolve-ch
-              ;; inline konserve cache resolution
-              (let [cache (:cache store)]
-                (if-let [v (cache/lookup @cache konserve-key)]
-                  (do (swap! cache cache/hit konserve-key)
-                      (assoc v :storage-addr (synthesize-storage-address konserve-key)))
-                  (let [ch (k/get-in store [konserve-key])]
-                    (-> (ha/<? ch)
-                        (assoc :storage-addr (synthesize-storage-address konserve-key)))))))
-       (reset! *resolve-state ::resolved)))
+          (ha/>! resolve-ch
+                 ;; inline konserve cache resolution
+                 (let [cache (:cache store)]
+                   (if-let [v (cache/lookup @cache konserve-key)]
+                     (do (swap! cache cache/hit konserve-key)
+                         (assoc v :storage-addr (synthesize-storage-address konserve-key)))
+                     (let [ch (k/get-in store [konserve-key])]
+                       (-> (ha/<? ch)
+                           (assoc :storage-addr (synthesize-storage-address konserve-key)))))))
+        (reset! *resolve-state ::resolved)))
     resolve-ch))
 
 (defn konserve-addr
@@ -109,14 +109,14 @@
     node)
   (-write-node [_ node session]
     (ha/go-try
-     (swap! session update-in [:writes] inc)
-     (let [pnode (encode node)
-           id (h/uuid pnode)
-           ch (k/assoc-in store [id] node)]
-       (ha/<? ch)
-       (konserve-addr store
-                      (n/-last-key node)
-                      id))))
+        (swap! session update-in [:writes] inc)
+      (let [pnode (encode node)
+            id (h/uuid pnode)
+            ch (k/assoc-in store [id] node)]
+        (ha/<? ch)
+        (konserve-addr store
+                       (n/-last-key node)
+                       id))))
   (-delete-addr [_ addr session]
     (swap! session update :deletes inc)))
 
@@ -129,12 +129,12 @@
 (defn create-tree-from-root-key
   [store root-key]
   (ha/go-try
-   (let [val (ha/<? (k/get-in store [root-key]))
-         ;; need last key to bootstrap
-         last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
-     (ha/<? (n/-resolve-chan (konserve-addr store
-                                            last-key
-                                            root-key))))))
+      (let [val (ha/<? (k/get-in store [root-key]))
+            ;; need last key to bootstrap
+            last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
+        (ha/<? (n/-resolve-chan (konserve-addr store
+                                               last-key
+                                               root-key))))))
 
 (defn add-hitchhiker-tree-handlers [store]
   (nippy/ensure-installed!)

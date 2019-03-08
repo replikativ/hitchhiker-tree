@@ -1,4 +1,5 @@
 (ns hitchhiker.tree.key-compare
+  #?(:cljs (:refer-clojure :exclude [-compare]))
   (:require [hitchhiker.tree.node :as n])
   #?(:clj (:import (clojure.lang IPersistentVector
                                  IPersistentSet

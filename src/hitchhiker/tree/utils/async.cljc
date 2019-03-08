@@ -50,7 +50,7 @@
 (defmacro >! [port x]
   (if-async?
       `(async/>! ~port ~x)
-      x))
+      port))
 
 (defmacro <! [port x]
   (if-async?

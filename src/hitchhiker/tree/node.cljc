@@ -1,4 +1,5 @@
 (ns hitchhiker.tree.node
+  #?(:cljs (:refer-clojure :exclude [-lookup]))
   (:require
    [hitchhiker.tree.utils.platform :as p]
    [hitchhiker.tree.utils.async]))
@@ -23,6 +24,7 @@
 (defprotocol IDataNode)
 (defprotocol IIndexNode)
 (defprotocol IResolved)
+
 (defn address?
   [node]
   (p/satisfies? IAddress node))
