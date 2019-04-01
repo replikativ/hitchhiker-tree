@@ -268,57 +268,57 @@
   ;; FIXME this function would benefit from a prefetching hint to keep
   ;; the next several sibs in mem
   (ha/go-try
-      (when-let [common-parent-path
-                 (backtrack-up-path-until path
-                                          (fn [parent index]
-                                            (< (inc index)
-                                               (count (:children parent)))))]
-        (let [next-index (-> common-parent-path peek inc)
-              parent (-> common-parent-path pop peek)
-              new-sibling (-> (nth (:children parent)
-                                   next-index)
-                              <?-resolve)
-              sibling-lineage (loop [res (transient [new-sibling])
-                                     s new-sibling]
-                                (let [first-child (-> s :children first)]
-                                  (if (n/address? first-child)
-                                    (let [resolved-first-child (<?-resolve first-child)]
-                                      (when (n/address? resolved-first-child)
-                                        (recur (conj! res resolved-first-child)
-                                               resolved-first-child)))
-                                    (persistent! res))))
-              path-suffix (-> (interleave sibling-lineage
-                                          (repeat 0))
-                              ;; butlast ensures we end w/ node
-                              (butlast))]
-          (-> (pop common-parent-path)
-              (conj next-index)
-              (into path-suffix))))))
+   (when-let [common-parent-path
+              (backtrack-up-path-until path
+                                       (fn [parent index]
+                                         (< (inc index)
+                                            (count (:children parent)))))]
+     (let [next-index (-> common-parent-path peek inc)
+           parent (-> common-parent-path pop peek)
+           new-sibling (-> (nth (:children parent)
+                                next-index)
+                           <?-resolve)
+           sibling-lineage (loop [res (transient [new-sibling])
+                                  s new-sibling]
+                             (let [first-child (-> s :children first)]
+                               (if (n/address? first-child)
+                                 (let [resolved-first-child (<?-resolve first-child)]
+                                   (when (n/address? resolved-first-child)
+                                     (recur (conj! res resolved-first-child)
+                                            resolved-first-child)))
+                                 (persistent! res))))
+           path-suffix (-> (interleave sibling-lineage
+                                       (repeat 0))
+                           ;; butlast ensures we end w/ node
+                           (butlast))]
+       (-> (pop common-parent-path)
+           (conj next-index)
+           (into path-suffix))))))
 
 (defn lookup-path
   "Given a B-tree and a key, gets a path into the tree"
   [tree key]
   (ha/go-try
-      (loop [;; alternating node/index/node/index/node... of the search taken
-             path (transient [tree])
-             ;; current search node
-             cur tree]
-        (let [children (:children cur)]
-          (when (> (count children) 0)
-            (if (data-node? cur)
-              (persistent! path)
-              (let [index (n/-lookup cur key)
-                    child (when-not (data-node? cur)
-                            (-> children
-                                ;; TODO what are the semantics for
-                                ;; exceeding on the right? currently
-                                ;; it's trunc to the last element
-                                (nth index (peek children))
-                                (<?-resolve)))]
-                (recur (-> path
-                           (conj! index)
-                           (conj! child))
-                       child))))))))
+   (loop [;; alternating node/index/node/index/node... of the search taken
+          path (transient [tree])
+          ;; current search node
+          cur tree]
+     (let [children (:children cur)]
+       (when (> (count children) 0)
+         (if (data-node? cur)
+           (persistent! path)
+           (let [index (n/-lookup cur key)
+                 child (when-not (data-node? cur)
+                         (-> children
+                             ;; TODO what are the semantics for
+                             ;; exceeding on the right? currently
+                             ;; it's trunc to the last element
+                             (nth index (peek children))
+                             (<?-resolve)))]
+             (recur (-> path
+                        (conj! index)
+                        (conj! child))
+                    child))))))))
 
 (defn lookup-key
   "Given a B-tree and a key, gets an iterator into the tree"
@@ -326,47 +326,47 @@
    (lookup-key tree key nil))
   ([tree key not-found]
    (ha/go-try
-       (-> (ha/<? (lookup-path tree key))
-           (peek)
-           (<?-resolve)
-           :children
-           (get key not-found)))))
+    (-> (ha/<? (lookup-path tree key))
+        (peek)
+        (<?-resolve)
+        :children
+        (get key not-found)))))
 
 (defn insert
   [{:keys [cfg] :as tree} k v]
   (ha/go-try
-      (let [path (ha/<? (lookup-path tree k))
-            {:keys [children] :or {children empty-sorted-map-by-compare}} (peek path)
-            updated-data-node (data-node (assoc children k v)
-                                         cfg)]
-        (loop [node updated-data-node
-               path (pop path)]
-          (if (empty? path)
-            (if (n/-overflow? node)
-              (let [{:keys [left right median]} (n/-split-node node)]
-                (index-node [left right]
-                            []
-                            cfg))
-              node)
-            (let [index (peek path)
-                  init-path (pop path)
-                  {:keys [children keys] :as parent} (peek init-path)]
-              ;; splice the split into the parent
-              (if (n/-overflow? node)
-                ;; TODO refactor paths to be node/index pairs or 2 vectors or something
-                (let [{:keys [left right median]} (n/-split-node node)
-                      new-children (catvec (conj (subvec children 0 index)
-                                                 left right)
-                                           (subvec children (inc index)))]
-                  (recur (-> parent
-                             (assoc :children new-children)
-                             (n/-dirty!))
-                         (pop init-path)))
-                (recur (-> parent
-                           ;;TODO this assoc seems to be a bottleneck
-                           (assoc :children (assoc children index node))
-                           (n/-dirty!))
-                       (pop init-path)))))))))
+   (let [path (ha/<? (lookup-path tree k))
+         {:keys [children] :or {children empty-sorted-map-by-compare}} (peek path)
+         updated-data-node (data-node (assoc children k v)
+                                      cfg)]
+     (loop [node updated-data-node
+            path (pop path)]
+       (if (empty? path)
+         (if (n/-overflow? node)
+           (let [{:keys [left right median]} (n/-split-node node)]
+             (index-node [left right]
+                         []
+                         cfg))
+           node)
+         (let [index (peek path)
+               init-path (pop path)
+               {:keys [children keys] :as parent} (peek init-path)]
+           ;; splice the split into the parent
+           (if (n/-overflow? node)
+             ;; TODO refactor paths to be node/index pairs or 2 vectors or something
+             (let [{:keys [left right median]} (n/-split-node node)
+                   new-children (catvec (conj (subvec children 0 index)
+                                              left right)
+                                        (subvec children (inc index)))]
+               (recur (-> parent
+                          (assoc :children new-children)
+                          (n/-dirty!))
+                      (pop init-path)))
+             (recur (-> parent
+                        ;;TODO this assoc seems to be a bottleneck
+                        (assoc :children (assoc children index node))
+                        (n/-dirty!))
+                    (pop init-path)))))))))
 
 ;;TODO: cool optimization: when merging children, push as many operations as you can
 ;;into them to opportunistically minimize overall IO costs
@@ -374,77 +374,77 @@
 (defn delete
   [{:keys [cfg] :as tree} key]
   (ha/go-try
-      (let [path (ha/<? (lookup-path tree key)) ;; don't care about the found key or its index
-            {:keys [children]
-             :or {children empty-sorted-map-by-compare}} (peek path)
-            updated-data-node (data-node (dissoc children key)
-                                         cfg)]
-        (loop [node updated-data-node
-               path (pop path)]
-          (if (empty? path)
-            ;; Check for special root underflow case
-            (if (and (index-node? node)
-                     (= 1 (count (:children node))))
-              (first (:children node))
-              node)
-            (let [index (peek path)
-                  init-path (pop path)
-                  {:keys [children keys op-buf] :as parent} (peek init-path)]
-              (if (n/-underflow? node) ;; splice the split into the parent
-                ;;TODO this needs to use a polymorphic sibling-count
-                ;;to work on serialized nodes
-                (let [bigger-sibling-idx
-                      (cond
-                        (= (dec (count children)) index) (dec index) ; only have left sib
-                        (zero? index) 1  ;only have right sib
-                        (> (count (:children (nth children (dec index))))
-                           (count (:children (nth children (inc index)))))
-                        (dec index)      ; right sib bigger
-                        :else (inc index))
-                      node-first? (> bigger-sibling-idx index)
-                      ;; if true, `node` is left
-                      merged (if node-first?
-                               (n/-merge-node node (<?-resolve (nth children bigger-sibling-idx)))
-                               (n/-merge-node (<?-resolve (nth children bigger-sibling-idx)) node))
-                      old-left-children (subvec children 0 (min index bigger-sibling-idx))
-                      old-right-children (subvec children (inc (max index bigger-sibling-idx)))]
-                  (if (n/-overflow? merged)
-                    (let [{:keys [left right median]} (n/-split-node merged)]
-                      (recur (index-node (catvec (conj old-left-children left right)
-                                                 old-right-children)
-                                         op-buf
-                                         cfg)
-                             (pop init-path)))
-                    (recur (index-node (catvec (conj old-left-children merged)
+   (let [path (ha/<? (lookup-path tree key)) ;; don't care about the found key or its index
+         {:keys [children]
+          :or {children empty-sorted-map-by-compare}} (peek path)
+         updated-data-node (data-node (dissoc children key)
+                                      cfg)]
+     (loop [node updated-data-node
+            path (pop path)]
+       (if (empty? path)
+         ;; Check for special root underflow case
+         (if (and (index-node? node)
+                  (= 1 (count (:children node))))
+           (first (:children node))
+           node)
+         (let [index (peek path)
+               init-path (pop path)
+               {:keys [children keys op-buf] :as parent} (peek init-path)]
+           (if (n/-underflow? node) ;; splice the split into the parent
+             ;;TODO this needs to use a polymorphic sibling-count
+             ;;to work on serialized nodes
+             (let [bigger-sibling-idx
+                   (cond
+                     (= (dec (count children)) index) (dec index) ; only have left sib
+                     (zero? index) 1  ;only have right sib
+                     (> (count (:children (nth children (dec index))))
+                        (count (:children (nth children (inc index)))))
+                     (dec index)      ; right sib bigger
+                     :else (inc index))
+                   node-first? (> bigger-sibling-idx index)
+                   ;; if true, `node` is left
+                   merged (if node-first?
+                            (n/-merge-node node (<?-resolve (nth children bigger-sibling-idx)))
+                            (n/-merge-node (<?-resolve (nth children bigger-sibling-idx)) node))
+                   old-left-children (subvec children 0 (min index bigger-sibling-idx))
+                   old-right-children (subvec children (inc (max index bigger-sibling-idx)))]
+               (if (n/-overflow? merged)
+                 (let [{:keys [left right median]} (n/-split-node merged)]
+                   (recur (index-node (catvec (conj old-left-children left right)
+                                              old-right-children)
+                                      op-buf
+                                      cfg)
+                          (pop init-path)))
+                 (recur (index-node (catvec (conj old-left-children merged)
 
-                                               old-right-children)
-                                       op-buf
-                                       cfg)
-                           (pop init-path))))
-                (recur (index-node (assoc children index node)
-                                   op-buf
-                                   cfg)
-                       (pop init-path)))))))))
+                                            old-right-children)
+                                    op-buf
+                                    cfg)
+                        (pop init-path))))
+             (recur (index-node (assoc children index node)
+                                op-buf
+                                cfg)
+                    (pop init-path)))))))))
 
 (defn b-tree
   [cfg & kvs]
   (ha/go-try
-      (loop [[[k v] & r] (partition 2 kvs)
-             t (data-node empty-sorted-map-by-compare
-                          cfg)]
-        (if k
-          (recur r (ha/<? (insert t k v)))
-          t))))
+   (loop [[[k v] & r] (partition 2 kvs)
+          t (data-node empty-sorted-map-by-compare
+                       cfg)]
+     (if k
+       (recur r (ha/<? (insert t k v)))
+       t))))
 
 ;;TODO make this a loop/recur instead of mutual recursion
 (defn flush-children
   [children backend session]
   (ha/go-try
-      (loop [[c & r] children
-             res (transient [])]
-        (if-not c
-          (persistent! res)
-          (recur r (conj! res (ha/<? (flush-tree c backend session))))))))
+   (loop [[c & r] children
+          res (transient [])]
+     (if-not c
+       (persistent! res)
+       (recur r (conj! res (ha/<? (flush-tree c backend session))))))))
 
 (defn flush-tree
   "Given the tree, finds all dirty nodes, delivering addrs into them.
@@ -452,111 +452,111 @@
    These form a GC cycle, have fun with the unmanaged memory port :)"
   ([tree backend]
    (ha/go-try
-       (let [session (b/-new-session backend)
-             flushed (ha/<? (flush-tree tree backend session))
-             root (b/-anchor-root backend flushed)]
-         {:tree (<?-resolve root) ;; root should never be unresolved for API
-          :stats session})))
+    (let [session (b/-new-session backend)
+          flushed (ha/<? (flush-tree tree backend session))
+          root (b/-anchor-root backend flushed)]
+      {:tree (<?-resolve root) ;; root should never be unresolved for API
+       :stats session})))
   ([tree backend stats]
    (ha/go-try
-       (if (n/-dirty? tree)
-         (let [cleaned-children (if (data-node? tree)
-                                  (:children tree)
-                                  (->> (flush-children (:children tree) backend stats)
-                                       ha/<?
-                                       catvec))
-               cleaned-node (assoc tree :children cleaned-children)
-               new-addr (ha/<? (b/-write-node backend cleaned-node stats))]
-           (ha/>! (:storage-addr tree)
-                  new-addr)
-           new-addr)
-         tree))))
+    (if (n/-dirty? tree)
+      (let [cleaned-children (if (data-node? tree)
+                               (:children tree)
+                               (->> (flush-children (:children tree) backend stats)
+                                    ha/<?
+                                    catvec))
+            cleaned-node (assoc tree :children cleaned-children)
+            new-addr (ha/<? (b/-write-node backend cleaned-node stats))]
+        (async/>!! (:storage-addr tree)
+                   new-addr)
+        new-addr)
+      tree))))
 
 ;; TODO merge this with the code above
 (defn flush-children-without-root
   [children backend session]
   (ha/go-try
-      (loop [[c & r] children
-             res (transient [])]
-        (if-not c
-          (persistent! res)
-          (recur r (conj! res (ha/<? (flush-tree-without-root c backend session false))))))))
+   (loop [[c & r] children
+          res (transient [])]
+     (if-not c
+       (persistent! res)
+       (recur r (conj! res (ha/<? (flush-tree-without-root c backend session false))))))))
 
 (defn flush-tree-without-root
   "Given the tree, finds all dirty nodes, delivering addrs into them.
    Does not flush root node, but returns it."
   ([tree backend]
    (ha/go-try
-       (let [session (b/-new-session backend)
-             flushed (ha/<? (flush-tree-without-root tree backend session true))
-             root (b/-anchor-root backend flushed)]
-         {:tree (<?-resolve root) ; root should never be unresolved for API
-          :stats session})))
+    (let [session (b/-new-session backend)
+          flushed (ha/<? (flush-tree-without-root tree backend session true))
+          root (b/-anchor-root backend flushed)]
+      {:tree (<?-resolve root) ; root should never be unresolved for API
+       :stats session})))
   ([tree backend stats root-node?]
    (ha/go-try
-       (if (n/-dirty? tree)
-         (let [cleaned-children (if (data-node? tree)
-                                  (:children tree)
-                                  ;; TODO throw on nested errors
-                                  (->> (flush-children-without-root (:children tree) backend stats)
-                                       ha/<?
-                                       catvec))
-               cleaned-node (assoc tree :children cleaned-children)]
-           (if root-node?
-             cleaned-node
-             (let [new-addr (ha/<? (b/-write-node backend cleaned-node stats))]
-               (ha/>! (:storage-addr tree)
-                      new-addr)
-               new-addr)))
-         tree))))
+    (if (n/-dirty? tree)
+      (let [cleaned-children (if (data-node? tree)
+                               (:children tree)
+                               ;; TODO throw on nested errors
+                               (->> (flush-children-without-root (:children tree) backend stats)
+                                    ha/<?
+                                    catvec))
+            cleaned-node (assoc tree :children cleaned-children)]
+        (if root-node?
+          cleaned-node
+          (let [new-addr (ha/<? (b/-write-node backend cleaned-node stats))]
+            (async/>!! (:storage-addr tree)
+                       new-addr)
+            new-addr)))
+      tree))))
 
 (ha/if-async?
-    (do
-      (defn forward-iterator
-        "Takes the result of a search and puts the iterated elements onto iter-ch
+ (do
+   (defn forward-iterator
+     "Takes the result of a search and puts the iterated elements onto iter-ch
   going forward over the tree as needed. Does lg(n) backtracking sometimes."
-        [iter-ch path start-key]
-        (ha/go-try
-            (loop [path path]
-              (if path
-                (let [start-node (peek path)
-                      elements (subseq (:children start-node)
-                                       >=
-                                       start-key)]
-                  (ha/<? (async/onto-chan iter-ch
-                                          elements false))
-                  (recur (ha/<? (right-successor (pop path)))))
-                (async/close! iter-ch)))))
+     [iter-ch path start-key]
+     (ha/go-try
+      (loop [path path]
+        (if path
+          (let [start-node (peek path)
+                elements (subseq (:children start-node)
+                                 >=
+                                 start-key)]
+            (ha/<? (async/onto-chan iter-ch
+                                    elements false))
+            (recur (ha/<? (right-successor (pop path)))))
+          (async/close! iter-ch)))))
 
-      #?(:clj
-         (defn lookup-fwd-iter
-           "Compatibility helper to clojure sequences. Please prefer the channel
+   #?(:clj
+      (defn lookup-fwd-iter
+        "Compatibility helper to clojure sequences. Please prefer the channel
   interface of forward-iterator, as this function blocks your thread, which
   disturbs async contexts and might lead to poor performance. It is mainly here
   to facilitate testing."
-           [tree key]
-           (let [path (ha/<?? (lookup-path tree key))
-                 iter-ch (async/chan)]
-             (forward-iterator iter-ch path key)
-             (ha/chan-seq iter-ch)))))
-    ;; else
-    (do
-      (defn forward-iterator
-        "Takes the result of a search and returns an iterator going
-   forward over the tree. Does lg(n) backtracking sometimes."
-        [path start-key]
-        (let [start-node (peek path)]
-          (assert (data-node? start-node))
-          (let [first-elements (-> start-node
-                                   :children ; Get the indices of it
-                                   (subseq >= start-key)) ; skip to the start-index
-                next-elements (lazy-seq
-                               (when-let [succ (right-successor (pop path))]
-                                 (forward-iterator succ start-key)))]
-            (concat first-elements next-elements))))
-
-      (defn lookup-fwd-iter
         [tree key]
-        (let [path (lookup-path tree key)]
-          (when path
-            (forward-iterator path key))))))
+        (let [path (ha/<?? (lookup-path tree key))
+              iter-ch (async/chan)]
+          (forward-iterator iter-ch path key)
+          (ha/chan-seq iter-ch)))))
+ ;; else
+ (do
+   (defn forward-iterator
+     "Takes the result of a search and returns an iterator going
+   forward over the tree. Does lg(n) backtracking sometimes."
+     [path start-key]
+     (let [start-node (peek path)]
+       (assert (data-node? start-node))
+       (let [first-elements (-> start-node
+                                :children ; Get the indices of it
+                                (subseq >= start-key)) ; skip to the start-index
+             next-elements (lazy-seq
+                            (when-let [succ (right-successor (pop path))]
+                              (forward-iterator succ start-key)))]
+         (concat first-elements next-elements))))
+
+   (defn lookup-fwd-iter
+     [tree key]
+     (let [path (lookup-path tree key)]
+       (when path
+         (forward-iterator path key))))))

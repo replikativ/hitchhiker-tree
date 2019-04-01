@@ -74,7 +74,6 @@
              backend (kons/->KonserveBackend store)
              flushed (ha/<?? (core/flush-tree
                               (time (reduce (fn [t i]
-                                              (prn :pre-insert i)
                                               (ha/<?? (msg/insert t i i)))
                                             (ha/<?? (core/b-tree (core/->Config 1 3 (- 3 1))))
                                             (range 1 11)))

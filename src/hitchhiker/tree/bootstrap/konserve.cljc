@@ -29,23 +29,20 @@
 (defn encode-index-node
   [node]
   (-> node
-      (nilify [:resolve-ch :storage-addr :*last-key-cache])
+      (nilify [:storage-addr :*last-key-cache])
       (assoc :children (mapv encode (:children node)))))
 
 (defn encode-data-node
   [node]
   (nilify node
-          [:resolve-ch
-           :storage-addr
+          [:storage-addr
            :*last-key-cache]))
 
 (defn encode-address
   [node]
   (nilify node
           [:store
-           :storage-addr
-           :resolve-ch
-           :*resolve-state]))
+           :storage-addr]))
 
 (defn encode
   [node]
@@ -60,47 +57,33 @@
   [key]
   (ha/promise-chan key))
 
-(defrecord KonserveAddr [store last-key konserve-key storage-addr
-                         resolve-ch
-                         *resolve-state]
+(defrecord KonserveAddr [store last-key konserve-key storage-addr]
   n/INode
   (-last-key [_] last-key)
 
   n/IAddress
   (-dirty? [_] false)
-  (-dirty! [this]
-    ;; (assoc this
-    ;;        :resolve-ch (async/promise-chan)
-    ;;        :*resolve-state (atom ::init)
-    ;;        :storage-addr (async/promise-chan))
-    this)
+  (-dirty! [this] this)
+
   (-resolve-chan [this]
-    ;; make sure we don't have a pending resolve in progress before
-    ;; triggering it
-    (when (compare-and-set! *resolve-state
-                            ::init
-                            ::pending)
-      (ha/go-try
-          (ha/>! resolve-ch
-                 ;; inline konserve cache resolution
-                 (let [cache (:cache store)]
-                   (if-let [v (cache/lookup @cache konserve-key)]
-                     (do (swap! cache cache/hit konserve-key)
-                         (assoc v :storage-addr (synthesize-storage-address konserve-key)))
-                     (let [ch (k/get-in store [konserve-key])]
-                       (-> (ha/<? ch)
-                           (assoc :storage-addr (synthesize-storage-address konserve-key)))))))
-        (reset! *resolve-state ::resolved)))
-    resolve-ch))
+    (ha/go-try
+     (let [cache (:cache store)]
+       (if-let [v (cache/lookup @cache konserve-key)]
+         (do
+           (swap! cache cache/hit konserve-key)
+           (assoc v :storage-addr (synthesize-storage-address konserve-key)))
+         (let [ch (k/get-in store [konserve-key])]
+           (assoc (ha/if-async?
+                   (ha/<? ch)
+                   (async/<!! ch))
+                  :storage-addr (synthesize-storage-address konserve-key))))))))
 
 (defn konserve-addr
   [store last-key konserve-key]
   (->KonserveAddr store
                   last-key
                   konserve-key
-                  (ha/promise-chan konserve-key)
-                  (async/promise-chan)
-                  (atom ::init)))
+                  (ha/promise-chan konserve-key)))
 
 (defrecord KonserveBackend [store]
   b/IBackend
@@ -109,14 +92,14 @@
     node)
   (-write-node [_ node session]
     (ha/go-try
-        (swap! session update-in [:writes] inc)
-      (let [pnode (encode node)
-            id (h/uuid pnode)
-            ch (k/assoc-in store [id] node)]
-        (ha/<? ch)
-        (konserve-addr store
-                       (n/-last-key node)
-                       id))))
+     (swap! session update-in [:writes] inc)
+     (let [pnode (encode node)
+           id (h/uuid pnode)
+           ch (k/assoc-in store [id] node)]
+       (ha/<? ch)
+       (konserve-addr store
+                      (n/-last-key node)
+                      id))))
   (-delete-addr [_ addr session]
     (swap! session update :deletes inc)))
 
@@ -129,8 +112,11 @@
 (defn create-tree-from-root-key
   [store root-key]
   (ha/go-try
-      (let [val (ha/<? (k/get-in store [root-key]))
-            ;; need last key to bootstrap
+   (let [ch (k/get-in store [root-key])
+         val (ha/if-async?
+              (ha/<? ch)
+              (async/<!! ch))
+         ;; need last key to bootstrap
             last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
         (ha/<? (n/-resolve-chan (konserve-addr store
                                                last-key

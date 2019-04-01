@@ -45,17 +45,7 @@
            ~@body
            (catch #?(:clj Exception :cljs js/Error) e#
              e#)))
-      `(do ~@body)))
-
-(defmacro >! [port x]
-  (if-async?
-      `(async/>! ~port ~x)
-      port))
-
-(defmacro <! [port x]
-  (if-async?
-      `(async/<! ~port ~x)
-      x))
+    `(do ~@body)))
 
 (defmacro <?
   "Same as core.async <! but throws an exception if the channel returns a
@@ -63,7 +53,7 @@
   [ch]
   (if-async?
       `(throw-if-exception (async/<! ~ch))
-      ch))
+    ch))
 
 #?(:clj
    (defmacro <??
@@ -72,18 +62,18 @@
      [ch]
      (if-async?
          `(throw-if-exception (async/<!! ~ch))
-         ch)))
+       ch)))
 
 (defn reduce<
   "Reduces over a sequence s with a go function go-f given the initial value
   init."
   [go-f init s]
   (go-try
-      (loop [res init
-             [f & r] s]
-        (if f
-          (recur (<? (go-f res f)) r)
-          res))))
+   (loop [res init
+          [f & r] s]
+     (if f
+       (recur (<? (go-f res f)) r)
+       res))))
 
 #?(:clj
    (defn chan-seq [ch]
