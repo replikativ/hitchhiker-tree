@@ -1,47 +1,67 @@
 (ns hitchhiker.tree.core-test
   (:refer-clojure :exclude [compare resolve satisfies?])
-  (:require [clojure.test :refer :all]
-            [clojure.test.check :as tc]
-            [clojure.test.check.clojure-test :refer [defspec]]
-            [clojure.test.check.generators :as gen]
-            [clojure.test.check.properties :as prop]
-            [hitchhiker.tree.core :refer :all]
-            [clojure.core.async :refer [promise-chan] :as async]))
+  (:require
+   [clojure.test :refer :all]
+   [clojure.test.check :as tc]
+   [clojure.test.check.clojure-test :refer [defspec]]
+   [clojure.test.check.generators :as gen]
+   [clojure.test.check.properties :as prop]
+   [hitchhiker.tree :refer :all]
+   [hitchhiker.tree.backend.testing :refer :all]
+   [hitchhiker.tree.node.testing :refer :all]
+   [hitchhiker.tree.node :as n]
+   [hitchhiker.tree.utils.async :refer :all :as ha]
+   [clojure.core.async  :as async]))
 
 (deftest reduce<-test
   (is (= 45 (<?? (reduce< (fn [res s]
-                            (go-try (+ res s)))
+                            (ha/go-try (+ res s)))
                           0
                           (range 10))))))
 
 (deftest simple-read-only-behavior
   (testing "Basic searches"
-    (let [data1 (data-node (->Config 3 5 2) (sorted-map 1 1 2 2 3 3 4 4 5 5))
-          data2 (data-node (->Config 3 5 2) (sorted-map 6 6 7 7 8 8 9 9 10 10))
-          root (index-node [data1 data2] (promise-chan) [] (->Config 3 5 2))]
+    (let [data1 (data-node (sorted-map 1 1 2 2 3 3 4 4 5 5)
+                           (->Config 3 5 2))
+          data2 (data-node (sorted-map 6 6 7 7 8 8 9 9 10 10)
+                           (->Config 3 5 2))
+          root (index-node [data1 data2]
+                           []
+                           (->Config 3 5 2))]
       (is (= (<?? (lookup-key root -10)) nil) "not found key")
       (is (= (<?? (lookup-key root 100)) nil) "not found key")
       (dotimes [i 10]
         (is (= (<?? (lookup-key root (inc i))) (inc i))))))
   (testing "Basic string key searches"
-    (let [data1 (data-node (->Config 3 5 2) (sorted-map "1" 1 "10" 10 "2" 2 "3" 3 "4" 4))
-          data2 (data-node (->Config 3 5 2) (sorted-map "5" 5 "6" 6 "7" 7 "8" 8 "9" 9))
-          root (index-node [data1 data2] (promise-chan) [] (->Config 3 5 2))]
+    (let [data1 (data-node (sorted-map "1" 1 "10" 10 "2" 2 "3" 3 "4" 4)
+                           (->Config 3 5 2))
+          data2 (data-node (sorted-map "5" 5 "6" 6 "7" 7 "8" 8 "9" 9)
+                           (->Config 3 5 2))
+          root (index-node [data1 data2]
+                           []
+                           (->Config 3 5 2))]
       (is (= (<?? (lookup-key root "-10")) nil) "not found key")
       (is (= (<?? (lookup-key root "100")) nil) "not found key")
       (dotimes [i 10]
         (is (= (<?? (lookup-key root (str (inc i)))) (inc i))))))
   (testing "basic fwd iterator"
-    (let [data1 (data-node (->Config 3 5 2) (sorted-map 1 1 2 2 3 3 4 4 5 5))
-          data2 (data-node (->Config 3 5 2) (sorted-map 6 6 7 7 8 8 9 9 10 10))
-          root (index-node [data1 data2] (promise-chan) [] (->Config 3 5 2))]
+    (let [data1 (data-node (sorted-map 1 1 2 2 3 3 4 4 5 5)
+                           (->Config 3 5 2) )
+          data2 (data-node (sorted-map 6 6 7 7 8 8 9 9 10 10)
+                           (->Config 3 5 2))
+          root (index-node [data1 data2]
+                           []
+                           (->Config 3 5 2))]
       (is (= (map first (lookup-fwd-iter root 4)) (range 4 11)))
       (is (= (map first (lookup-fwd-iter root 0)) (range 1 11)))))
   (testing "index nodes identified as such"
-    (let [data (data-node (->Config 3 5 2) (sorted-map 1 1))
-          root (index-node [data] (promise-chan) [] (->Config 3 5 2))]
-      (is (index? root))
-      (is (not (index? data))))))
+    (let [data (data-node (sorted-map 1 1)
+                          (->Config 3 5 2))
+          root (index-node [data]
+                           []
+                           (->Config 3 5 2))]
+      (is (index-node? root))
+      (is (not (index-node? data))))))
 
 
 (defn insert-helper
@@ -88,24 +108,30 @@
                       b-tree-order (lookup-fwd-iter b-tree-without Integer/MIN_VALUE)]
                   (= (seq (remove (set set-b) set-a)) (seq (map first b-tree-order))))))
 
-
 (deftest insert-test
-  (let [data1 (data-node (->Config 3 3 2) (sorted-map 1 "1" 2 "2" 3 "3" 4 "4"))
-        root (index-node [data1] (promise-chan) [] (->Config 3 3 2))]
+  (let [data1 (data-node (sorted-map 1 "1" 2 "2" 3 "3" 4 "4")
+                         (->Config 3 3 2))
+        root (index-node [data1]
+                         []
+                         (->Config 3 3 2))]
+
     (is (= (map second (lookup-fwd-iter (<?? (insert root 3 "3")) -10)) ["1" "2" "3" "4"]))
     (are [x] (= (map second (lookup-fwd-iter (<?? (insert root x (str x))) -10)) (sort (map str (conj [1 2 3 4] x))))
-         0
-         2.5
-         5))
-  (let [data1 (data-node (->Config 3 3 2) (sorted-map 1 1 2 2 3 3 4 4 5 5))
-        root (index-node [data1] (promise-chan) [] (->Config 3 3 2))]
+      0
+      2.5
+      5))
+  (let [data1 (data-node (sorted-map 1 1 2 2 3 3 4 4 5 5)
+                         (->Config 3 3 2))
+        root (index-node [data1]
+                         []
+                         (->Config 3 3 2))]
     (are [x y] (= (map first (lookup-fwd-iter (<?? (insert root x x)) y))
                   (drop-while
-                    #(< % y)
-                    (sort (conj [1 2 3 4 5] x))))
-         0 3
-         2.5 2
-         5.5 3)))
+                   #(< % y)
+                   (sort (conj [1 2 3 4 5] x))))
+      0 3
+      2.5 2
+      5.5 3)))
 
 (deftest simple-delete-tests
   (let [tree (reduce insert-helper (<?? (b-tree (->Config 3 3 2))) (range 5))]
@@ -122,13 +148,13 @@
   ([node]
    (let [{:keys [index-b data-b]} (:cfg node)]
      (or
-       ;; First case: it's just a datanode
-       (and (data-node? node)
-            (< (count (:children node)) (* 2 data-b)))
-       ;; Second case: it's an index
-       (let [acc (atom [])] ; acc is for ensuring all leaves are the same depth
-         (and (check-node-is-balanced node index-b acc 2 0)
-              (apply = @acc))))))
+      ;; First case: it's just a datanode
+      (and (data-node? node)
+           (< (count (:children node)) (* 2 data-b)))
+      ;; Second case: it's an index
+      (let [acc (atom [])] ; acc is for ensuring all leaves are the same depth
+        (and (check-node-is-balanced node index-b acc 2 0)
+             (apply = @acc))))))
   ([{:keys [children] :as node} b acc min height]
    (if (<= min (count children) (dec (* 2 b))) ;between min (inc) & max (exc)
      (if-not (data-node? node)
@@ -164,19 +190,19 @@
   (let [add-freq (long (* 1000 add-vs-del-ratio))
         del-freq (long (* 1000 (- 1 add-vs-del-ratio)))]
     (prop/for-all [ops (gen/vector (gen/frequency
-                                     [[add-freq (gen/tuple (gen/return :add)
-                                                           (gen/no-shrink gen/int))]
-                                      [del-freq (gen/tuple (gen/return :del)
-                                                           (gen/no-shrink gen/int))]])
+                                    [[add-freq (gen/tuple (gen/return :add)
+                                                          (gen/no-shrink gen/int))]
+                                     [del-freq (gen/tuple (gen/return :del)
+                                                          (gen/no-shrink gen/int))]])
                                    num-ops)]
                   (let [b-tree (reduce (fn [t [op x]]
                                          (let [x-reduced (mod x universe-size)]
-                                           (condp = op
+                                           (case op
                                              :add (insert-helper t x-reduced)
                                              :del (<?? (delete t x-reduced)))))
                                        (<?? (b-tree (->Config 3 3 2)))
                                        ops)]
-  ;                  (println ops)
+                                        ;                  (println ops)
                     (check-node-is-balanced b-tree)))))
 
 (defspec test-few-keys-many-ops
@@ -205,4 +231,3 @@
                   (= (seq sorted-set-order)
                      (seq b-tree-order)
                      (seq flushed-tree-order)))))
-;;TODO should test that flushing can be interleaved without races

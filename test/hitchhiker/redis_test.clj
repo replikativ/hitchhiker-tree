@@ -2,8 +2,9 @@
   (:require [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [hitchhiker.redis :as redis]
-            [hitchhiker.tree.core :refer [<??] :as core]
+            [hitchhiker.tree.bootstrap.redis :as redis]
+            [hitchhiker.tree :as core]
+            [hitchhiker.tree.utils.async :as ha]
             hitchhiker.tree.core-test
             [hitchhiker.tree.messaging :as msg]
             [taoensso.carmine :as car :refer [wcar]]))
@@ -16,17 +17,16 @@
   [t v]
   (seq (map first (msg/lookup-fwd-iter t v))))
 
-
 (defn mixed-op-seq
   "This is like the basic mixed-op-seq tests, but it also mixes in flushes to redis
    and automatically deletes the old tree"
   [add-freq del-freq flush-freq universe-size num-ops]
   (prop/for-all [ops (gen/vector (gen/frequency
-                                   [[add-freq (gen/tuple (gen/return :add)
-                                                         (gen/no-shrink gen/int))]
-                                    [flush-freq (gen/return [:flush])]
-                                    [del-freq (gen/tuple (gen/return :del)
-                                                         (gen/no-shrink gen/int))]])
+                                  [[add-freq (gen/tuple (gen/return :add)
+                                                        (gen/no-shrink gen/int))]
+                                   [flush-freq (gen/return [:flush])]
+                                   [del-freq (gen/tuple (gen/return :del)
+                                                        (gen/no-shrink gen/int))]])
                                  num-ops)]
                 (assert (let [ks (wcar {} (car/keys "*"))]
                           (or (empty? ks)
@@ -35,16 +35,16 @@
                         "Start with no keys")
                 (let [[b-tree root set]
                       (reduce (fn [[t root set] [op x]]
-                                       (let [x-reduced (when x (mod x universe-size))]
-                                         (condp = op
-                                           :flush (let [t (:tree (<?? (core/flush-tree t (redis/->RedisBackend))))]
-                                                    (when root
-                                                      (wcar {} (redis/drop-ref root)))
-                                                    #_(println "flush")
-                                                    [t (<?? (:storage-addr t)) set])
-                                           :add (do #_(println "add") [(<?? (insert t x-reduced)) root (conj set x-reduced)])
-                                           :del (do #_(println "del") [(<?? (msg/delete t x-reduced)) root (disj set x-reduced)]))))
-                              [(<?? (core/b-tree (core/->Config 3 3 2))) nil #{}]
+                                (let [x-reduced (when x (mod x universe-size))]
+                                  (case op
+                                    :flush (let [t (:tree (ha/<?? (core/flush-tree t (redis/->RedisBackend))))]
+                                             (when root
+                                               (wcar {} (redis/drop-ref root)))
+                                             #_(println "flush")
+                                             [t (ha/<?? (:storage-addr t)) set])
+                                    :add (do #_(println "add") [(ha/<?? (insert t x-reduced)) root (conj set x-reduced)])
+                                    :del (do #_(println "del") [(ha/<?? (msg/delete t x-reduced)) root (disj set x-reduced)]))))
+                              [(ha/<?? (core/b-tree (core/->Config 3 3 2))) nil #{}]
                               ops)]
                   #_(println "Make it to the end of a test, tree has" (count (lookup-fwd-iter b-tree -1)) "keys left")
                   (let [b-tree-order (lookup-fwd-iter b-tree -1)
@@ -69,7 +69,7 @@
 
   (count (remove  (reduce (fn [t [op x]]
                             (let [x-reduced (when x (mod x 1000))]
-                              (condp = op
+                              (condp =
                                 :flush t
                                 :add (conj t x-reduced)
                                 :del (disj t x-reduced))))
@@ -78,20 +78,19 @@
   (:op-buf test-tree)
   (count (sort (reduce (fn [t [op x]]
                          (let [x-reduced (when x (mod x 1000))]
-                           (condp = op
+                           (case op
                              :flush t
                              :add (conj t x-reduced)
                              :del (disj t x-reduced))))
                        #{}
                        opseq)))
 
-
   (let [ops (->> (read-string (slurp "broken-data.edn"))
                  (map (fn [[op x]] [op (mod x 100000)]))
                  (drop-last  125))]
     (let [[b-tree s] (reduce (fn [[t s] [op x]]
                                (let [x-reduced (mod x 100000)]
-                                 (condp = op
+                                 (case op
                                    :add [(insert t x-reduced)
                                          (conj s x-reduced)]
                                    :del [(msg/delete t x-reduced)
@@ -110,7 +109,7 @@
     (let [opseq (read-string (slurp "broken-data.edn"))
           [b-tree root] (reduce (fn [[t root] [op x]]
                                   (let [x-reduced (when x (mod x 1000))]
-                                    (condp = op
+                                    (case op
                                       :flush (let [_ (println "About to flush...")
                                                    t (:tree (core/flush-tree t (redis/->RedisBackend)))]
                                                (when root
@@ -130,7 +129,7 @@
       (println "Got diff"
                (count (remove  (reduce (fn [t [op x]]
                                          (let [x-reduced (when x (mod x 1000))]
-                                           (condp = op
+                                           (case op
                                              :flush t
                                              :add (conj t x-reduced)
                                              :del (disj t x-reduced))))

@@ -4,7 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.10.0"]
-                 [org.clojure/clojurescript "1.10.439" :scope "provided"]
+                 [org.clojure/clojurescript "1.10.520" :scope "provided"]
                  [org.clojure/core.memoize "0.7.1"]
                  [com.taoensso/carmine "2.12.2"]
                  [org.clojure/core.rrb-vector "0.0.14"]
@@ -28,7 +28,7 @@
                                   ;; plotting
                                   [aysylu/loom "1.0.2"]
                                   [cheshire "5.8.1"]]
-                   :source-paths ["src" "dev"]
+                   :source-paths ["src" "dev" "test"]
                    :plugins [[lein-figwheel "0.5.18"]]
                    :repl-options {; for nREPL dev you really need to limit output
                                   :init (set! *print-length* 50)}}}

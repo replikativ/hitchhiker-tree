@@ -1,10 +1,12 @@
 (ns hitchhiker.bench
-  (:require [clojure.pprint :as pp]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
             [excel-templates.build :as excel]
-            [hitchhiker.redis :as redis]
-            [hitchhiker.tree.core :refer [<?? <? go-try] :as core]
+            [hitchhiker.tree.bootstrap.redis :as redis]
+            [hitchhiker.tree.backend.testing]
+            [hitchhiker.tree.utils.async :refer [<?? <?] :as ha]
+            [hitchhiker.tree :as core]
+            [hitchhiker.tree.utils.async :as ha :refer [<?? <? go-try]]
             [hitchhiker.tree.messaging :as msg])
   (:import [java.io File FileWriter]))
 
@@ -27,7 +29,7 @@
   "Returns a b-tree with msg insert"
   [b backend]
   (let [sqrt-b (long (Math/sqrt b))]
-    {:structure (<?? (core/b-tree(core/->Config sqrt-b b (- b sqrt-b))))
+    {:structure (<?? (core/b-tree (core/->Config sqrt-b b (- b sqrt-b))))
      :insert msg/insert
      :delete msg/delete
      :flush (fn [x] (<?? (core/flush-tree x backend)))}))
@@ -50,10 +52,10 @@
     (.mkdirs my-dir)
     (spit (File. my-dir "time") (str (java.util.Date.)))
     (let [speed-csv (FileWriter. (File. my-dir (str "speed_" aux ".csv")))
-         ; flush-csv (FileWriter. (File. my-dir (str "flush_iops_" aux ".csv")))
+                                        ; flush-csv (FileWriter. (File. my-dir (str "flush_iops_" aux ".csv")))
           ]
       {:speed speed-csv
-       ;:flush flush-csv
+                                        ;:flush flush-csv
        })))
 
 (defn benchmark
@@ -181,7 +183,6 @@
 
 (defn make-template-for-one-tree-freq-combo
   [list-of-benchmark-results filter-by]
-  ;(clojure.pprint/pprint list-of-benchmark-results)
   (assert (= 2 (count list-of-benchmark-results)) "Should be random and ordered")
   (let [indexed (group-by :ds list-of-benchmark-results)]
     (map #(vector (:n %1) (:ins-avg-ns %1) (:writes %1) (:ins-avg-ns %2) (:writes %2))
@@ -219,7 +220,7 @@
           (not= (count arguments) 0) (exit 1 (usage summary))
           errors (exit 1 (error-msg errors)))
         (let [backend (case (:backend options)
-                        "testing" (core/->TestingBackend)
+                        "testing" (hitchhiker.tree.backend.testing/->TestingBackend)
                         "redis" (do (redis/start-expiry-thread!)
                                     (redis/->RedisBackend)))
               delete-xform (case (:delete-pattern options)
@@ -250,8 +251,8 @@
                                       "_"
                                       (:name ds))
                         out (create-output-dir
-                              root
-                              codename)
+                             root
+                             codename)
                         _ (println "Doing" codename)
                         bench-res (benchmark (:num-operations options) ds flush-freq structure out delete-xform)]]
             (swap! results conj
@@ -262,13 +263,11 @@
                     :b (:tree-width options)
                     :delete-pattern (:delete-pattern options)
                     :results bench-res}))
-          ;(println "results")
-          ;(clojure.pprint/pprint @results)
           (swap! outputs conj (template-one-sheet @results)))))
     (excel/render-to-file
-      "template_benchmark.xlsx"
-      (.getPath (File. root "analysis.xlsx"))
-      {"SingleDS"
-       (map-indexed (fn [i s]
-                      (assoc s :sheet-name (str "Trial " (inc i))))
-                    @outputs)})))
+     "template_benchmark.xlsx"
+     (.getPath (File. root "analysis.xlsx"))
+     {"SingleDS"
+      (map-indexed (fn [i s]
+                     (assoc s :sheet-name (str "Trial " (inc i))))
+                   @outputs)})))
