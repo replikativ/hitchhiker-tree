@@ -4,6 +4,7 @@
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
    [hitchhiker.tree.utils.async :as ha]
+   [hitchhiker.tree.key-compare :as kc]
    [hitchhiker.tree :as tree]
    [hitchhiker.tree.core-test]
    [hitchhiker.tree.op :as op]
@@ -40,6 +41,27 @@
                       b-tree (reduce insert (ha/<?? (tree/b-tree (tree/->Config 3 3 2))) v)
                       b-tree-order (lookup-fwd-iter b-tree "")]
                   (= (seq sorted-set-order) b-tree-order))))
+
+(defspec test-insert-uuid
+  1000
+  (prop/for-all [v (gen/vector gen/uuid)]
+                (let [sorted-set-order (into (sorted-set-by kc/compare-uuids) v)
+                      b-tree (reduce insert (ha/<?? (tree/b-tree (tree/->Config 3 3 2))) v)
+                      zero-uuid (java.util.UUID/fromString "00000000-0000-0000-0000-000000000000")
+                      b-tree-order (lookup-fwd-iter b-tree zero-uuid)]
+                  (= (seq sorted-set-order) b-tree-order))))
+
+(defspec test-insert-uuid-ordering
+  1000
+  (prop/for-all [v gen/uuid]
+                (let [one #uuid "20000000-0000-4000-8000-000000000000" ;; `one` and `two` don't compare correctly with the default UUID comparison implementation, see https://bugs.java.com/bugdatabase/view_bug.do?bug_id=7025832
+                      two #uuid "e0000000-0000-4000-8000-000000000000"
+                      three #uuid "e0000001-0000-4000-8000-000000000000"
+                      uuids [v three one two]
+                      sorted-set-order (into (sorted-set-by kc/compare-uuids) uuids)
+                      b-tree (reduce insert (ha/<?? (tree/b-tree (tree/->Config 3 3 2))) uuids)
+                      b-tree-order (lookup-fwd-iter b-tree two)]
+                  (not (contains? (into #{} b-tree-order) one)))))
 
 (defspec test-delete2
   1000
