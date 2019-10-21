@@ -41,6 +41,9 @@
             Boolean
             (-order-on-edn-types [_] 7)
 
+            java.util.UUID
+            (-order-on-edn-types [_] 8)
+
             nil
             (-order-on-edn-types [_] 10000)
 
@@ -71,12 +74,25 @@
              boolean
              (-order-on-edn-types [_] 7)
 
+             cljs.core/UUID
+             (-order-on-edn-types [_] 8)
+
              nil
              (-order-on-edn-types [_] 10000)
 
              object
              (-order-on-edn-types [t] (throw-unsupported-type t))]))
 
+#?(:clj
+   (defn compare-uuids
+     [^java.util.UUID x ^java.util.UUID y]
+     (let [mx (.getMostSignificantBits x)
+           my (.getMostSignificantBits y)
+           cm (Long/compareUnsigned mx my)]
+       (if (zero? cm)
+         (Long/compareUnsigned (.getLeastSignificantBits x)
+                               (.getLeastSignificantBits y))
+         cm))))
 
 (extend-protocol IKeyCompare
   ;; By default, we use the default comparator
@@ -133,6 +149,16 @@
        (-compare [^BigInteger key1 key2]
                  (if (instance? BigInteger key2)
                    (.compareTo key1 key2)
+                   (try
+                     (compare key1 key2)
+                     (catch ClassCastException e
+                       (- (n/-order-on-edn-types key2)
+                          (n/-order-on-edn-types key1))))))
+
+       java.util.UUID
+       (-compare [^java.util.UUID key1 key2]
+                 (if (instance? java.util.UUID key2)
+                   (compare-uuids key1 key2)
                    (try
                      (compare key1 key2)
                      (catch ClassCastException e
