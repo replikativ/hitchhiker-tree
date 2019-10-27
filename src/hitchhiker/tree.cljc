@@ -14,12 +14,11 @@
   'stats' object as well
 
   * The 'stats' object must be convertible to a summary or whatever at the end"
-  (:refer-clojure :exclude [subvec satisfies?])
+  (:refer-clojure :exclude [subvec])
   (:require
    [hitchhiker.tree.utils.async :as ha :include-macros true]
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.backend :as b]
-   [hitchhiker.tree.utils.platform :refer [satisfies?]]
    [hitchhiker.tree.key-compare :as c]
    [clojure.core.rrb-vector :refer [catvec subvec]]
    #?(:clj [clojure.core.async :as async]

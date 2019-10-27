@@ -1,18 +1,14 @@
 (ns hitchhiker.tree.bootstrap.konserve
   (:refer-clojure :exclude [subvec])
   (:require
-   [clojure.core.rrb-vector :refer [catvec subvec]]
    [konserve.cache :as k]
-   [konserve.memory :refer [new-mem-store]]
    [hasch.core :as h]
-   [clojure.set :as set]
    [hitchhiker.tree.messaging :as msg]
    [hitchhiker.tree :as tree]
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.backend :as b]
    [hitchhiker.tree.key-compare :as c]
    [hitchhiker.tree.utils.async :as ha]
-   [hitchhiker.tree.codec.nippy :as nippy]
    #?@(:clj [[clojure.core.async :as async]
              [clojure.core.cache :as cache]]
        :cljs [[cljs.core.async :include-macros true :as async]
@@ -123,7 +119,9 @@
                                                root-key))))))
 
 (defn add-hitchhiker-tree-handlers [store]
-  (nippy/ensure-installed!)
+  ;; TODO check whether store is using nippy in the future and load on the fly:
+  #_[hitchhiker.tree.codec.nippy :as nippy]
+  #_(nippy/ensure-installed!)
   (swap! (:read-handlers store)
          merge
          {'hitchhiker.tree.bootstrap.konserve.KonserveAddr

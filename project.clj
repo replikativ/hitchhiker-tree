@@ -1,4 +1,4 @@
-(defproject io.replikativ/hitchhiker-tree "0.1.4"
+(defproject io.replikativ/hitchhiker-tree "0.1.5-SNAPSHOT"
   :description "A Hitchhiker Tree Library"
   :url "https://github.com/dgrnbrg/hitchhiker-tree"
   :license {:name "Eclipse Public License"
@@ -6,10 +6,10 @@
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [org.clojure/clojurescript "1.10.520" :scope "provided"]
                  [org.clojure/core.memoize "0.7.1"]
-                 [com.taoensso/carmine "2.12.2"]
+                 [com.taoensso/carmine "2.12.2" :scope "provided"]
                  [org.clojure/core.rrb-vector "0.0.14"]
                  [org.clojure/core.cache "0.7.2"]
-                 [io.replikativ/konserve "0.5.0"]]
+                 [io.replikativ/konserve "0.5.1"]]
   :aliases {"bench" ["with-profile" "profiling" "run" "-m" "hitchhiker.bench"]}
   :jvm-opts ["-server" "-Xmx3700m" "-Xms3700m"]
   :profiles {:test
