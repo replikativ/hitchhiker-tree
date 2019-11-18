@@ -58,7 +58,8 @@
 
   Adds a (hexadecimal) timestamp in milliseconds to the start of the
   key; this is so the GC can properly delete keys that don't exist in
-  the tree anymore"
+  the tree anymore, but also skips keys that were added after the GC
+  process begins."
   [uuid]
   (format "%016x.%s" (System/currentTimeMillis) uuid))
 
