@@ -53,6 +53,15 @@
   [key]
   (ha/promise-chan key))
 
+(defn create-id
+  "Generate a storage ID from a content UUID.
+
+  Adds a (hexadecimal) timestamp in milliseconds to the start of the
+  key; this is so the GC can properly delete keys that don't exist in
+  the tree anymore"
+  [uuid]
+  (format "%016x.%s" (System/currentTimeMillis) uuid))
+
 (defrecord KonserveAddr [store last-key konserve-key storage-addr]
   n/INode
   (-last-key [_] last-key)
@@ -90,7 +99,7 @@
     (ha/go-try
      (swap! session update-in [:writes] inc)
      (let [pnode (encode node)
-           id (h/uuid pnode)
+           id (create-id (h/uuid pnode))
            ch (k/assoc-in store [id] node)]
        (ha/<? ch)
        (konserve-addr store

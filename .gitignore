@@ -13,3 +13,7 @@ pom.xml.asc
 *.swo
 *.swn
 *~
+/.idea
+*.iml
+profiles.clj
+/scripts
