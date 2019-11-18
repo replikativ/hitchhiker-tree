@@ -1,6 +1,5 @@
 (ns hitchhiker.tree.tracing-gc
   (:require [clojure.core.async :as async]
-            [clojure.tools.logging :as log]
             [hitchhiker.tree :as hh]
             [hitchhiker.tree.node :as n]
             [hitchhiker.tree.utils.async :as ha]))
@@ -32,12 +31,9 @@
                      (when-let [root (first roots)]
                        (loop [nodes [root]]
                          (when-let [node (first nodes)]
-                           (log/debug :task ::trace-gc! :phase :marking :visiting-node (async/poll! (:storage-addr node)))
                            (let [node (if (hh/resolved? node)
                                         node
-                                        (do-<! (do
-                                                 (log/debug :task ::trace-gc! :phase :marking :resolve-node node)
-                                                 (n/-resolve-chan node))))
+                                        (do-<! (n/-resolve-chan node)))
                                  nodes (if (hh/index-node? node)
                                          (into (subvec nodes 1) (:children node))
                                          (subvec nodes 1))]
