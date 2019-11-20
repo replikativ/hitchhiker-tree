@@ -28,7 +28,7 @@
   if any. Weights become edge labels unless a label is specified.
   Labels also include attributes when the graph satisfies AttrGraph."
   [g & {:keys [graph-name node-label edge-label]
-        :or {graph-name "graph"} :as opts }]
+        :or {graph-name "graph"} :as opts}]
   (let [d? (directed? g)
         w? (weighted? g)
         a? (attr? g)
@@ -100,7 +100,7 @@
                            (ha/<?? (msg/insert t i i)))
                          (ha/<?? (tree/b-tree (tree/->Config 3 3 2)))
                          (shuffle (range 1 30))))
-           (kons/->KonserveBackend store))))
+           (kons/->KonserveBackend store nil))))
 
 
 (def flushed
@@ -109,7 +109,7 @@
                            (ha/<?? (msg/insert t i i)))
                          (:tree flushed)
                          (shuffle (range -4 -2))))
-           (kons/->KonserveBackend store))))
+           (kons/->KonserveBackend store nil))))
 
 
 
@@ -117,7 +117,7 @@
   ;; TODO double root node?
   (do
     (def store (kons/add-hitchhiker-tree-handlers
-                (kc/ensure-cache (ha/<?? (new-mem-store)))) )
+                (kc/ensure-cache (ha/<?? (new-mem-store)))))
 
 
     ;; insertion
@@ -127,7 +127,7 @@
                                         (ha/<?? (tree/b-tree (tree/->Config 2 2 2)))
                                         (concat (range 1 12)
                                                 #_[0 13 14 -1 15])))
-                          (kons/->KonserveBackend store))))
+                          (kons/->KonserveBackend store nil))))
 
 
     (def flushed (ha/<?? (tree/flush-tree
@@ -135,7 +135,7 @@
                                           (ha/<?? (msg/insert t i i)))
                                         (:tree flushed)
                                         (range 12 14)))
-                          (kons/->KonserveBackend store))))
+                          (kons/->KonserveBackend store nil))))
 
     (view (create-graph store))))
 
@@ -217,8 +217,8 @@
     [k (-> v
            (dissoc :storage-addr :cfg)
            (update :children (fn [cs] (mapv #(dissoc % :storage-addr :store) cs)))
-           (update :op-buf (fn [cs] (mapv #(into {} %) cs)))
-           )]
+           (update :op-buf (fn [cs] (mapv #(into {} %) cs))))]
+
     [k (dissoc v :storage-addr :cfg)]))
 
 

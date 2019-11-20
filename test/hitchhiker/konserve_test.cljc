@@ -45,7 +45,7 @@
                             (kc/ensure-cache (async/<!
                                               (new-mem-store)
                                               #_(new-fs-store folder)))) ;; always use core.async here!
-                     backend (kons/->KonserveBackend store)
+                     backend (kons/->KonserveBackend store nil)
                      init-tree (ha/<? (ha/reduce< (fn [t i] (msg/insert t i i))
                                                   (ha/<? (core/b-tree (core/->Config 1 3 (- 3 1))))
                                                   (range 1 11)))
@@ -71,7 +71,7 @@
              _ (delete-store folder)
              store (kons/add-hitchhiker-tree-handlers
                     (kc/ensure-cache (async/<!! (new-fs-store folder :config {:fsync false}))))
-             backend (kons/->KonserveBackend store)
+             backend (kons/->KonserveBackend store nil)
              flushed (ha/<?? (core/flush-tree
                               (time (reduce (fn [t i]
                                               (ha/<?? (msg/insert t i i)))

@@ -1,18 +1,19 @@
 (ns hitchhiker.tree.bootstrap.konserve
   (:refer-clojure :exclude [subvec])
   (:require
-   [konserve.cache :as k]
-   [hasch.core :as h]
-   [hitchhiker.tree.messaging :as msg]
-   [hitchhiker.tree :as tree]
-   [hitchhiker.tree.node :as n]
-   [hitchhiker.tree.backend :as b]
-   [hitchhiker.tree.key-compare :as c]
-   [hitchhiker.tree.utils.async :as ha]
-   #?@(:clj [[clojure.core.async :as async]
-             [clojure.core.cache :as cache]]
-       :cljs [[cljs.core.async :include-macros true :as async]
-              [cljs.cache :as cache]])))
+    [konserve.cache :as k]
+    [hasch.core :as h]
+    [hitchhiker.tree.messaging :as msg]
+    [hitchhiker.tree :as tree]
+    [hitchhiker.tree.node :as n]
+    [hitchhiker.tree.backend :as b]
+    [hitchhiker.tree.key-compare :as c]
+    [hitchhiker.tree.utils.async :as ha]
+    #?@(:clj  [[clojure.core.async :as async]
+               [clojure.core.cache :as cache]]
+        :cljs [[cljs.core.async :include-macros true :as async]
+               [cljs.cache :as cache]]))
+  #?(:clj (:import [java.util Date])))
 
 (declare encode)
 
@@ -53,15 +54,24 @@
   [key]
   (ha/promise-chan key))
 
+(defprotocol PKonserveStampGenerator
+  (-stamp [this]
+    "Generate a new unique identifier for ordering storage IDs."))
+
+(defrecord KonserveTimestampGenerator []
+  PKonserveStampGenerator
+  (-stamp [_] #?(:clj (Date.) :cljs (js/Date.))))
+
+(def +default-stamp-generator+ (->KonserveTimestampGenerator))
+
 (defn create-id
   "Generate a storage ID from a content UUID.
 
-  Adds a (hexadecimal) timestamp in milliseconds to the start of the
-  key; this is so the GC can properly delete keys that don't exist in
-  the tree anymore, but also skips keys that were added after the GC
-  process begins."
-  [uuid]
-  (format "%016x.%s" (System/currentTimeMillis) uuid))
+  Adds a timestamp in milliseconds to the start of the key; this is so
+  the GC can properly delete keys that don't exist in the tree anymore,
+  but also skips keys that were added after the GC process begins."
+  [stamp-generator uuid]
+  [(-stamp stamp-generator) uuid])
 
 (defrecord KonserveAddr [store last-key konserve-key storage-addr]
   n/INode
@@ -82,7 +92,9 @@
            (assoc (ha/if-async?
                    (ha/<? ch)
                    (async/<!! ch))
-                  :storage-addr (synthesize-storage-address konserve-key))))))))
+                  :storage-addr (synthesize-storage-address konserve-key)))))))
+
+  (-raw-address [_] konserve-key))
 
 (defn konserve-addr
   [store last-key konserve-key]
@@ -91,7 +103,7 @@
                   konserve-key
                   (ha/promise-chan konserve-key)))
 
-(defrecord KonserveBackend [store]
+(defrecord KonserveBackend [store stamp-generator]
   b/IBackend
   (-new-session [_] (atom {:writes 0 :deletes 0}))
   (-anchor-root [_ {:keys [konserve-key] :as node}]
@@ -100,7 +112,7 @@
     (ha/go-try
      (swap! session update-in [:writes] inc)
      (let [pnode (encode node)
-           id (create-id (h/uuid pnode))
+           id (create-id (or stamp-generator +default-stamp-generator+) (h/uuid pnode))
            ch (k/assoc-in store [id] node)]
        (ha/<? ch)
        (konserve-addr store

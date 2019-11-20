@@ -37,7 +37,7 @@
                                  nodes (if (hh/index-node? node)
                                          (into (subvec nodes 1) (:children node))
                                          (subvec nodes 1))]
-                             (when-let [address (async/poll! (:storage-addr node))]
+                             (when-let [address (n/-raw-address node)]
                                (async/<! (observe-addr! gc-scratch address)))
                              (recur nodes))))
                        (recur (rest roots))))]

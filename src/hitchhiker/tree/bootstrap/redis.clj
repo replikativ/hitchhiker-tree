@@ -178,6 +178,8 @@
     (ha/go-try (-> (totally-fetch redis-key)
                    (assoc :storage-addr (synthesize-storage-addr redis-key)))))
 
+  (-raw-address [_] redis-key)
+
   n/INode
   (-last-key [_] last-key))
 

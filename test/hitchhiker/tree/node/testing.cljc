@@ -9,6 +9,7 @@
   (-dirty? [this] false)
   (-dirty! [this] this)
   (-resolve-chan [_] resolve-ch)
+  (-raw-address [_] (n/-raw-address node))
   n/INode
   (-last-key [_] last-key))
 

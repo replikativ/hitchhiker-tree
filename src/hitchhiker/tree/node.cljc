@@ -10,7 +10,8 @@
 (defprotocol IAddress
   (-dirty? [node] "Returns true if this should be flushed")
   (-dirty! [node] "Marks a node as being dirty if it was clean")
-  (-resolve-chan [node] "Returns the INode version of this node; could trigger IO, returns a core.async promise-chan"))
+  (-resolve-chan [node] "Returns the INode version of this node; could trigger IO, returns a core.async promise-chan")
+  (-raw-address [node] "Returns the underlying storage's raw address; returns nil if no storage address."))
 
 (defprotocol INode
   (-last-key [node] "Returns the rightmost key of the node")

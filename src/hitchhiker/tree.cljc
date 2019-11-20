@@ -81,6 +81,9 @@
            :storage-addr (async/promise-chan)
            :*last-key-cache (cache)))
 
+  (-raw-address [this]
+    (some-> storage-addr (async/poll!) (n/-raw-address)))
+
   n/INode
   (-last-key [this]
     (<-cache *last-key-cache
@@ -171,6 +174,9 @@
     (assoc this
            :storage-addr (async/promise-chan)
            :*last-key-cache (cache)))
+
+  (-raw-address [_]
+    (some-> storage-addr (async/poll!) (n/-raw-address)))
 
   n/INode
   (-last-key [this]
