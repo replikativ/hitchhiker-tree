@@ -1,13 +1,6 @@
 (ns hitchhiker.tree.tracing-gc.epoch
-  "A GC scratch implementation that considers timestamped
-  keys, and only considers keys that are marked before some
-  epoch.
-
-  Only recognizes keys that are a vector, and which the first
-  element is comparable to the epoch."
-  (:require [hitchhiker.tree.tracing-gc :as gc]
-            #?(:clj  [clojure.core.async :as async]
-               :cljs [cljs.core.async :as async :include-macros true])))
+  "Utilities for filtering konserve backend addresses
+  by epoch.")
 
 (defn compare-stamps
   [e1 e2]
