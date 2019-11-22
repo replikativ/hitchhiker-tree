@@ -12,6 +12,13 @@
             [hitchhiker.tree.tracing-gc.epoch :as gce])
   (:import [java.util Date]))
 
+(defn chan->seq
+  "Turn core.async channel into a lazy sequence."
+  [chan]
+  (lazy-seq
+    (when-let [v (async/<!! chan)]
+      (cons v (chan->seq chan)))))
+
 (deftest test-tracing-gc
   (let [store (kc/ensure-cache (async/<!! (mem/new-mem-store)))
         tree (volatile! (tree/b-tree (tree/->Config 2 4 2)))]
@@ -21,12 +28,14 @@
     (testing "that GC doesn't remove anything if there are no garbage nodes."
       (let [all-storage-keys (async/<!! (async/into [] (k/keys store)))
             removed (volatile! #{})
-            scratch (gce/->EpochBasedGCScratch (atom #{}) (Date.))
             delete-fn (fn [k]
                         (async/go
                           (vswap! removed conj k)
                           (async/<! (k/dissoc store k))))]
-        (gc/trace-gc! scratch [@tree] (k/keys store) delete-fn)
+        (gc/sweep! (gc/mark [@tree])
+                   (gce/accept-before-epoch (Date.))
+                   (chan->seq (k/keys store))
+                   delete-fn)
         (is (empty? @removed))
         (is (= (set all-storage-keys) (async/<!! (async/into #{} (k/keys store)))))))
     (testing "that GC removed garbage nodes"
@@ -47,11 +56,13 @@
                                (recur (subvec nodes 1) live)))
                            live))
             removed (volatile! #{})
-            scratch (gce/->EpochBasedGCScratch (atom #{}) (Date.))
             delete-fn (fn [k]
                         (vswap! removed conj k)
                         (async/<!! (k/dissoc store k)))]
-        (gc/trace-gc! scratch [@tree] (k/keys store) delete-fn)
+        (gc/sweep! (gc/mark [@tree])
+                   (gce/accept-before-epoch (Date.))
+                   (chan->seq (k/keys store))
+                   delete-fn)
         (is (seq @removed))
         (is (= live-nodes (async/<!! (async/into #{} (k/keys store))))))
       (testing "that GC leaves a usable tree in storage"

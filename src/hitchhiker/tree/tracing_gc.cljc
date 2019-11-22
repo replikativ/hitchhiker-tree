@@ -4,45 +4,40 @@
             [hitchhiker.tree.node :as n]
             [hitchhiker.tree.utils.async :as ha]))
 
-(defprotocol IGCScratch
-  (observe-addr! [this addr] "Marks the given addr as being currently active")
-  (observed? [this addr] "Returns true if the given addr was observed"))
+(defn mark
+  "Mark addresses in gc-roots, traversing the entire tree for each root.
+  If addresses is given, it must be a set containing possibly already-marked
+  addresses.
 
-(defmacro do-<!
-  "Force into an async taking call.
+  Returns all marked addresses."
+  ([gc-roots] (mark gc-roots #{}))
+  ([gc-roots addresses]
+   (loop [addresses (volatile! (transient addresses))
+          roots gc-roots]
+     (if-let [root (first roots)]
+       (do
+         (loop [nodes [root]]
+           (when-let [node (first nodes)]
+             (let [node (if (hh/resolved? node)
+                          node
+                          (ha/<?? (n/-resolve-chan node)))
+                   new-nodes (if (hh/index-node? node)
+                               (into (subvec nodes 1) (:children node))
+                               (subvec nodes 1))]
+               (when-let [address (n/-raw-address node)]
+                 (vswap! addresses conj! address))
+               (recur new-nodes))))
+         (recur addresses (rest roots)))
+       (persistent! @addresses)))))
 
-  Evaluates to <! when in an async backend.
-  Wraps form in a thread when non-async."
-  [& form]
-  (ha/if-async?
-    `(async/<! ~@form)
-    `(async/<! (async/thread ~@form))))
-
-(defn trace-gc!
-  "Does a tracing GC and frees up all unused keys.
-   This is a simple mark-sweep algorithm.
-
-   gc-scratch should be an instance of IGCScratch
-   gc-roots should be a list of the roots of currently active trees.
-   all-keys should be a core.async channel that will contain every key in storage.
-   delete-fn will be called on every key that should be deleted during the sweep phase. It is expected to return a channel that yields when the item is deleted."
-  [gc-scratch gc-roots all-keys delete-fn]
-  (loop [roots gc-roots]
-    (when-let [root (first roots)]
-      (loop [nodes [root]]
-        (when-let [node (first nodes)]
-          (let [node (if (hh/resolved? node)
-                       node
-                       (ha/<?? (n/-resolve-chan node)))
-                nodes (if (hh/index-node? node)
-                        (into (subvec nodes 1) (:children node))
-                        (subvec nodes 1))]
-            (when-let [address (n/-raw-address node)]
-              (observe-addr! gc-scratch address))
-            (recur nodes))))
-      (recur (rest roots))))
-  (loop []
-    (when-let [address (async/<!! all-keys)]
-      (when-not (observed? gc-scratch address)
+(defn sweep!
+  "Walk all storage addresses from seq all-addresses, calling delete-fn on
+  each key that for which accept-fn returns true, AND is not contained
+  in the set addresses."
+  [addresses accept-fn all-addresses delete-fn]
+  (loop [addrs all-addresses]
+    (when-let [address (first addrs)]
+      (when (and (accept-fn address)
+                 (not (contains? addresses address)))
         (delete-fn address))
-      (recur))))
+      (recur (rest addrs)))))

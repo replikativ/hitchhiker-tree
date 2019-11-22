@@ -16,19 +16,18 @@
              (compare (.getTime e1) (.getTime e2))
              (compare e1 e2))))
 
-(defn- after-epoch?
+(defn- before-epoch?
   [address epoch]
   (if (and (sequential? address)
            (<= 1 (count address))
            (= (type epoch) (type (first address))))
-    (not (neg? (compare-stamps (first address) epoch)))
-    true))
+    (neg? (compare-stamps (first address) epoch))
+    false))
 
-(defrecord EpochBasedGCScratch [store epoch]
-  gc/IGCScratch
-  (observe-addr! [_ addr]
-    (swap! store conj addr))
-
-  (observed? [_ addr]
-    (or (after-epoch? addr epoch)
-        (contains? @store addr))))
+(defn accept-before-epoch
+  "Return a function that accepts addresses that occur
+  before the given epoch. Addresses that are not a sequential
+  value and don't have a compatible timestamp as the first
+  element are not accepted."
+  [epoch]
+  (fn [address] (before-epoch? address epoch)))
