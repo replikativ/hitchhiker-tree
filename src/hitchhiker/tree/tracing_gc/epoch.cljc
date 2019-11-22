@@ -1,6 +1,11 @@
-(ns hitchhiker.tree.tracing-gc.konserve
-  (:require [konserve.core :as k]
-            [hitchhiker.tree.tracing-gc :as gc]
+(ns hitchhiker.tree.tracing-gc.epoch
+  "A GC scratch implementation that considers timestamped
+  keys, and only considers keys that are marked before some
+  epoch.
+
+  Only recognizes keys that are a vector, and which the first
+  element is comparable to the epoch."
+  (:require [hitchhiker.tree.tracing-gc :as gc]
             #?(:clj  [clojure.core.async :as async]
                :cljs [cljs.core.async :as async :include-macros true])))
 
@@ -13,18 +18,17 @@
 
 (defn- after-epoch?
   [address epoch]
-  (if (and (vector? address)
-           (= 2 (count address))
+  (if (and (sequential? address)
+           (<= 1 (count address))
            (= (type epoch) (type (first address))))
     (not (neg? (compare-stamps (first address) epoch)))
     true))
 
-(defrecord KonserveGCScratch [store epoch]
+(defrecord EpochBasedGCScratch [store epoch]
   gc/IGCScratch
   (observe-addr! [_ addr]
-    (k/assoc store addr :marked))
+    (swap! store conj addr))
 
   (observed? [_ addr]
-    (async/go
-      (or (after-epoch? addr epoch)
-          (= :marked (async/<! (k/get store addr)))))))
+    (or (after-epoch? addr epoch)
+        (contains? @store addr))))

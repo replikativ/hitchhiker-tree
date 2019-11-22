@@ -27,24 +27,22 @@
    all-keys should be a core.async channel that will contain every key in storage.
    delete-fn will be called on every key that should be deleted during the sweep phase. It is expected to return a channel that yields when the item is deleted."
   [gc-scratch gc-roots all-keys delete-fn]
-  (let [mark-phase (async/go-loop [roots gc-roots]
-                     (when-let [root (first roots)]
-                       (loop [nodes [root]]
-                         (when-let [node (first nodes)]
-                           (let [node (if (hh/resolved? node)
-                                        node
-                                        (do-<! (n/-resolve-chan node)))
-                                 nodes (if (hh/index-node? node)
-                                         (into (subvec nodes 1) (:children node))
-                                         (subvec nodes 1))]
-                             (when-let [address (n/-raw-address node)]
-                               (async/<! (observe-addr! gc-scratch address)))
-                             (recur nodes))))
-                       (recur (rest roots))))]
-    (async/go
-      (async/<! mark-phase)
-      (loop []
-        (when-let [address (async/<! all-keys)]
-          (when-not (async/<! (observed? gc-scratch address))
-            (async/<! (delete-fn address)))
-          (recur))))))
+  (loop [roots gc-roots]
+    (when-let [root (first roots)]
+      (loop [nodes [root]]
+        (when-let [node (first nodes)]
+          (let [node (if (hh/resolved? node)
+                       node
+                       (ha/<?? (n/-resolve-chan node)))
+                nodes (if (hh/index-node? node)
+                        (into (subvec nodes 1) (:children node))
+                        (subvec nodes 1))]
+            (when-let [address (n/-raw-address node)]
+              (observe-addr! gc-scratch address))
+            (recur nodes))))
+      (recur (rest roots))))
+  (loop []
+    (when-let [address (async/<!! all-keys)]
+      (when-not (observed? gc-scratch address)
+        (delete-fn address))
+      (recur))))

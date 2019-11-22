@@ -1,16 +1,15 @@
 (ns hitchhiker.tree.tracing-gc-test
   (:require [clojure.core.async :as async]
-            [clojure.test :refer :all]
-            [konserve.memory :as mem]
+            [clojure.test :refer [deftest is testing]]
             [hitchhiker.tree :as tree]
             [hitchhiker.tree.messaging :as hmsg]
             [hitchhiker.tree.bootstrap.konserve :as kons]
+            [konserve.cache :as kc]
             [konserve.core :as k]
+            [konserve.memory :as mem]
             [hitchhiker.tree.utils.async :as ha]
             [hitchhiker.tree.tracing-gc :as gc]
-            [hitchhiker.tree.tracing-gc.konserve :as gck]
-            [hitchhiker.tree.node :as n]
-            [konserve.cache :as kc])
+            [hitchhiker.tree.tracing-gc.epoch :as gce])
   (:import [java.util Date]))
 
 (deftest test-tracing-gc
@@ -22,12 +21,12 @@
     (testing "that GC doesn't remove anything if there are no garbage nodes."
       (let [all-storage-keys (async/<!! (async/into [] (k/keys store)))
             removed (volatile! #{})
-            scratch (gck/->KonserveGCScratch (async/<!! (mem/new-mem-store)) (Date.))
+            scratch (gce/->EpochBasedGCScratch (atom #{}) (Date.))
             delete-fn (fn [k]
                         (async/go
                           (vswap! removed conj k)
                           (async/<! (k/dissoc store k))))]
-        (async/<!! (gc/trace-gc! scratch [@tree] (k/keys store) delete-fn))
+        (gc/trace-gc! scratch [@tree] (k/keys store) delete-fn)
         (is (empty? @removed))
         (is (= (set all-storage-keys) (async/<!! (async/into #{} (k/keys store)))))))
     (testing "that GC removed garbage nodes"
@@ -48,12 +47,11 @@
                                (recur (subvec nodes 1) live)))
                            live))
             removed (volatile! #{})
-            scratch (gck/->KonserveGCScratch (async/<!! (mem/new-mem-store)) (Date.))
+            scratch (gce/->EpochBasedGCScratch (atom #{}) (Date.))
             delete-fn (fn [k]
-                        (async/go
-                          (vswap! removed conj k)
-                          (async/<! (k/dissoc store k))))]
-        (async/<!! (gc/trace-gc! scratch [@tree] (k/keys store) delete-fn))
+                        (vswap! removed conj k)
+                        (async/<!! (k/dissoc store k)))]
+        (gc/trace-gc! scratch [@tree] (k/keys store) delete-fn)
         (is (seq @removed))
         (is (= live-nodes (async/<!! (async/into #{} (k/keys store))))))
       (testing "that GC leaves a usable tree in storage"
