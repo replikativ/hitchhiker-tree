@@ -34,10 +34,9 @@
   "Walk all storage addresses from seq all-addresses, calling delete-fn on
   each key that for which accept-fn returns true, AND is not contained
   in the set addresses."
-  [addresses accept-fn all-addresses delete-fn]
+  [addresses all-addresses delete-fn]
   (loop [addrs all-addresses]
     (when-let [address (first addrs)]
-      (when (and (accept-fn address)
-                 (not (contains? addresses address)))
+      (when (not (contains? addresses address))
         (delete-fn address))
       (recur (rest addrs)))))

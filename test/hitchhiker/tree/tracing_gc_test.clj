@@ -33,8 +33,7 @@
                           (vswap! removed conj k)
                           (async/<! (k/dissoc store k))))]
         (gc/sweep! (gc/mark [@tree])
-                   (gce/accept-before-epoch (Date.))
-                   (chan->seq (k/keys store))
+                   (filter (gce/accept-before-epoch (Date.)) (chan->seq (k/keys store)))
                    delete-fn)
         (is (empty? @removed))
         (is (= (set all-storage-keys) (async/<!! (async/into #{} (k/keys store)))))))
@@ -60,8 +59,7 @@
                         (vswap! removed conj k)
                         (async/<!! (k/dissoc store k)))]
         (gc/sweep! (gc/mark [@tree])
-                   (gce/accept-before-epoch (Date.))
-                   (chan->seq (k/keys store))
+                   (filter (gce/accept-before-epoch (Date.)) (chan->seq (k/keys store)))
                    delete-fn)
         (is (seq @removed))
         (is (= live-nodes (async/<!! (async/into #{} (k/keys store))))))
