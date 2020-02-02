@@ -144,7 +144,28 @@
           'hitchhiker.tree.messaging.DeleteOp
           msg/map->DeleteOp
           'hitchhiker.tree.Config
-          tree/map->Config})
+          tree/map->Config
+
+          ;; support pre-refactoring 0.1.5 hitchhiker-tree record names
+          'hitchhiker.konserve.KonserveAddr
+          (fn [{:keys [last-key konserve-key]}]
+            (konserve-addr store
+                           last-key
+                           konserve-key))
+          'hitchhiker.tree.core.DataNode
+          (fn [{:keys [children cfg] :as d}]
+            (tree/data-node (into (sorted-map-by c/-compare)
+                                  children)
+                            cfg))
+          'hitchhiker.tree.core.IndexNode
+          (fn [{:keys [children cfg op-buf]}]
+            (tree/index-node (vec children)
+                             (vec op-buf)
+                             cfg))
+          'hitchhiker.tree.core.Config
+          tree/map->Config
+
+          })
   (swap! (:write-handlers store)
          merge
          {'hitchhiker.tree.bootstrap.konserve.KonserveAddr

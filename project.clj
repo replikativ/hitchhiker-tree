@@ -1,6 +1,6 @@
-(defproject io.replikativ/hitchhiker-tree "0.1.5-SNAPSHOT"
+(defproject io.replikativ/hitchhiker-tree "0.1.6"
   :description "A Hitchhiker Tree Library"
-  :url "https://github.com/dgrnbrg/hitchhiker-tree"
+  :url "https://github.com/replikativ/hitchhiker-tree"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.10.0"]
@@ -34,6 +34,10 @@
                                   :init (set! *print-length* 50)}}}
   :clean-targets ^{:protect false} ["resources/public/js" "target"]
 
+  :deploy-repositories [["clojars"  {:url "https://clojars.org/repo"
+                                     :username :env/clojars_username
+                                     :password :env/clojars_password
+                                     :sign-releases false}]]
 
   :cljsbuild {:builds
               [{:id "dev"
