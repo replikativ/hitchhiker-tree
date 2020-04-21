@@ -44,6 +44,9 @@
             java.util.UUID
             (-order-on-edn-types [_] 8)
 
+            java.util.Date
+            (-order-on-edn-types [_] 9)
+
             nil
             (-order-on-edn-types [_] 10000)
 
@@ -76,6 +79,9 @@
 
              cljs.core/UUID
              (-order-on-edn-types [_] 8)
+
+             js/Date
+             (-order-on-edn-types [_] 9)
 
              nil
              (-order-on-edn-types [_] 10000)
@@ -164,6 +170,23 @@
                      (catch ClassCastException e
                        (- (n/-order-on-edn-types key2)
                           (n/-order-on-edn-types key1))))))
+
+       java.util.Date
+       (-compare [^java.util.Date key1 key2]
+                 (if (instance? java.util.Date key2)
+                   (cond
+                     (< (.getTime key1) (.getTime key2)) -1
+                     (= (.getTime key1) (.getTime key2)) 0
+                     :else 1)
+                   (try
+                     (compare key1 key2)
+                     (catch ClassCastException e
+                       (- (n/-order-on-edn-types key2)
+                          (n/-order-on-edn-types key1))))))
+       nil
+       (-compare [^java.lang.Null key1 key2]
+                 (- (n/-order-on-edn-types key2)
+                    (n/-order-on-edn-types key1)))
        ]
       :cljs
       [number
@@ -189,4 +212,9 @@
                        (- (n/-order-on-edn-types key2)
                           (n/-order-on-edn-types key1))))
                    (- (n/-order-on-edn-types key2)
-                      (n/-order-on-edn-types key1))))]))
+                      (n/-order-on-edn-types key1))))
+       nil
+       (-compare [key1 key2]
+                 (- (n/-order-on-edn-types key2)
+                    (n/-order-on-edn-types key1)))
+       ]))

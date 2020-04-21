@@ -59,11 +59,11 @@
                     res))))
 
 
-(defspec test-many-keys-bigger-trees
-  100
-  (mixed-op-seq 800 200 10 1000 1000))
-
 (comment
+  (defspec test-many-keys-bigger-trees
+    100
+    (mixed-op-seq 800 200 10 1000 1000))
+
   (test-many-keys-bigger-trees)
 
 

@@ -1,4 +1,4 @@
-(defproject io.replikativ/hitchhiker-tree "0.1.6"
+(defproject io.replikativ/hitchhiker-tree "0.1.7-SNAPSHOT"
   :description "A Hitchhiker Tree Library"
   :url "https://github.com/replikativ/hitchhiker-tree"
   :license {:name "Eclipse Public License"

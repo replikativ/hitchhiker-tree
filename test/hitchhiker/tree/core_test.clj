@@ -108,6 +108,38 @@
                       b-tree-order (lookup-fwd-iter b-tree-without Integer/MIN_VALUE)]
                   (= (seq (remove (set set-b) set-a)) (seq (map first b-tree-order))))))
 
+
+(deftest insert-comparator-test
+  (let [root (reduce insert-helper (<?? (b-tree (->Config 3 3 2)))
+                     (concat (range 5)
+                             [#inst "2020-04-21T09:50:15.257-00:00"
+                              #inst "2020-04-21T09:51:15.257-00:00"
+                              #uuid "58cc42f0-ccf7-41de-ab2e-79fc325d51db" 
+                              nil
+                              -0.2
+                              1.9E10
+                              true
+                              :foo
+                              "bar"
+                              'bar
+                              :bar
+                              'baz
+                              false
+                              "Foo"
+                              9N
+                              10.0M
+                              ]))]
+    (is (= (map second (lookup-fwd-iter root nil))
+           '(nil
+             #inst "2020-04-21T09:50:15.257-00:00"
+             #inst "2020-04-21T09:51:15.257-00:00"
+             #uuid "58cc42f0-ccf7-41de-ab2e-79fc325d51db"
+             false true
+             :bar :foo
+             bar baz
+             "Foo" "bar"
+             -0.2 0 1 2 3 4 9N 10.0M 1.9E10)))))
+
 (deftest insert-test
   (let [data1 (data-node (sorted-map 1 "1" 2 "2" 3 "3" 4 "4")
                          (->Config 3 3 2))
@@ -115,7 +147,10 @@
                          []
                          (->Config 3 3 2))]
 
+    (is (= (map second (lookup-fwd-iter (<?? (insert root 5 "5")) -10)) ["1" "2" "3" "4" "5"]))
+
     (is (= (map second (lookup-fwd-iter (<?? (insert root 3 "3")) -10)) ["1" "2" "3" "4"]))
+
     (are [x] (= (map second (lookup-fwd-iter (<?? (insert root x (str x))) -10)) (sort (map str (conj [1 2 3 4] x))))
       0
       2.5
