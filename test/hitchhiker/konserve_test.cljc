@@ -30,38 +30,13 @@
   (ha/go-try
    (let [iter-ch (async/chan)
          path (ha/<? (core/lookup-path tree key))]
-     (when path
-       (msg/forward-iterator iter-ch path key))
-     (ha/<? (async/into [] iter-ch)))))
+     (ha/if-async?
+      (do
+        (when path
+          (msg/forward-iterator iter-ch path key))
+        (ha/<? (async/into [] iter-ch)))
+      (msg/forward-iterator path key)))))
 
-
-(let [folder "/tmp/async-hitchhiker-tree-test"
-      _ (delete-store folder)
-      store (kons/add-hitchhiker-tree-handlers
-             (kc/ensure-cache (async/<!! (new-fs-store folder :config {:fsync false}))))
-      backend (kons/->KonserveBackend store)
-      config (core/->Config 1 3 (- 3 1))
-      flushed (ha/<?? (core/flush-tree
-                       (time (reduce (fn [t i]
-                                       (ha/<?? (msg/insert t i i)))
-                                     (ha/<?? (core/b-tree config))
-                                     (range 1 11)))
-                       backend))
-      root-key (kons/get-root-key (:tree flushed))
-      tree (ha/<?? (kons/create-tree-from-root-key store root-key))]
-  (is (= (ha/<?? (msg/lookup tree -10)) nil))
-  (is (= (ha/<?? (msg/lookup tree 100)) nil))
-  (dotimes [i 10]
-    (is (= (ha/<?? (msg/lookup tree (inc i))) (inc i))))
-  (is (= (map first (msg/lookup-fwd-iter tree 4)) (range 4 11)))
-  (is (= (map first (msg/lookup-fwd-iter tree 0)) (range 1 11)))
-  (let [deleted (ha/<?? (core/flush-tree (ha/<?? (msg/delete tree 3)) backend))
-        root-key (kons/get-root-key (:tree deleted))
-        tree (ha/<?? (kons/create-tree-from-root-key store root-key))]
-    (is (= (ha/<?? (msg/lookup tree 2)) 2))
-    (is (= (ha/<?? (msg/lookup tree 3)) nil))
-    (is (= (ha/<?? (msg/lookup tree 4)) 4)))
-  (delete-store folder))
 
 (deftest simple-konserve-test
   (testing "Insert and lookup"
@@ -159,31 +134,31 @@
        (assert res (str "These are unequal: " (pr-str b-tree-order) " " (pr-str (seq (sort set)))))
        res))))
 
-;; ;; TODO recheck when https://dev.clojure.org/jira/browse/TCHECK-128 is fixed
-;; ;; and share clj mixed-op-seq test, remove ops.cljc then.
-;; #?(:cljs
-;;    (deftest manual-mixed-op-seq
-;;      (async done
-;;             (ha/go-try
-;;              (loop [[ops & r] recorded-ops]
-;;                (when ops
-;;                  (is (ha/<? (ops-test ops 1000)))
-;;                  (recur r)))
-;;              (done)))))
+;; TODO recheck when https://dev.clojure.org/jira/browse/TCHECK-128 is fixed
+;; and share clj mixed-op-seq test, remove ops.cljc then.
+#?(:cljs
+   (deftest manual-mixed-op-seq
+     (async done
+            (ha/go-try
+             (loop [[ops & r] recorded-ops]
+               (when ops
+                 (is (ha/<? (ops-test ops 1000)))
+                 (recur r)))
+             (done)))))
 
 
-;; #?(:clj
-;;    (defn mixed-op-seq
-;;      "This is like the basic mixed-op-seq tests, but it also mixes in flushes to a konserve filestore"
-;;      [add-freq del-freq flush-freq universe-size num-ops]
-;;      (prop/for-all [ops (gen/vector (gen/frequency
-;;                                      [[add-freq (gen/tuple (gen/return :add)
-;;                                                            (gen/no-shrink gen/int))]
-;;                                       [flush-freq (gen/return [:flush])]
-;;                                       [del-freq (gen/tuple (gen/return :del)
-;;                                                            (gen/no-shrink gen/int))]])
-;;                                     num-ops)]
-;;                    (ha/<?? (ops-test ops universe-size)))))
+#?(:clj
+   (defn mixed-op-seq
+     "This is like the basic mixed-op-seq tests, but it also mixes in flushes to a konserve filestore"
+     [add-freq del-freq flush-freq universe-size num-ops]
+     (prop/for-all [ops (gen/vector (gen/frequency
+                                     [[add-freq (gen/tuple (gen/return :add)
+                                                           (gen/no-shrink gen/int))]
+                                      [flush-freq (gen/return [:flush])]
+                                      [del-freq (gen/tuple (gen/return :del)
+                                                           (gen/no-shrink gen/int))]])
+                                    num-ops)]
+                   (ha/<?? (ops-test ops universe-size)))))
 
 
 ;; #?(:clj
@@ -192,11 +167,11 @@
 ;;      (mixed-op-seq 800 200 10 1000 1000)))
 
 
-;; #?(:cljs
-;;    (defn ^:export test-all [cb]
-;;      (defmethod cljs.test/report [:cljs.test/default :end-run-tests] [m]
-;;        (cb (clj->js m))
-;;        (if (cljs.test/successful? m)
-;;          (println "Success!")
-;;          (println "FAIL")))
-;;      (run-tests)))
+#?(:cljs
+   (defn ^:export test-all [cb]
+     (defmethod cljs.test/report [:cljs.test/default :end-run-tests] [m]
+       (cb (clj->js m))
+       (if (cljs.test/successful? m)
+         (println "Success!")
+         (println "FAIL")))
+     (run-tests)))
