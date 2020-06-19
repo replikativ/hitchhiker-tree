@@ -14,6 +14,19 @@
   [t k]
   (ha/<?? (msg/insert t k k)))
 
+(comment
+
+  (defn upsert-helper
+    [t k]
+    (ha/<?? (msg/upsert t k k)))
+
+
+  (:op-buf
+   (reduce upsert-helper (ha/<?? (tree/b-tree (tree/->Config 3 3 2))) (into (sorted-set)
+                                                                           #{1 2 3 4 5 6 7})))
+
+  )
+
 (defn lookup-fwd-iter
   [t v]
   (seq (map first (msg/lookup-fwd-iter t v))))

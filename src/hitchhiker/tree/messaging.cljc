@@ -19,6 +19,53 @@
   (-apply-op-to-tree [_ tree]
     (tree/insert tree key value)))
 
+
+(defrecord UpsertOp [key value] ;; TODO add tx
+  op/IOperation
+  (-affects-key [_] key)
+  (-apply-op-to-coll [_ map]
+    #_(let [[e a] value
+          [_ _ v t] (get-in map [e a]) ;; TODO
+          ]
+      (if v
+        [e a v (if keep-history?  tx)]))
+    #_(update map key (fn [[_ _ v t] value]
+                      (datom e a (.-v old-datom)  false)
+                      ) value)
+
+    (assoc map key value))
+  (-apply-op-to-tree [_ tree]
+    (tree/insert tree key value)))
+
+(comment
+
+
+  ;; 1. branch
+  (InsertOp [e a v] new-datom)
+
+
+  ;; 2. branch
+  ;; do we land at the right spot for [e a]?
+  (UpsertOp [e a] value)
+
+
+  (if (multival? db a)
+    ;; 1. branch
+    (if (empty? (-search db [e a v]))
+      (transact-report report new-datom)
+      report)
+    ;; 2. branch
+    (if-some [^Datom old-datom (first (-search db [e a]))]
+      (if (= (.-v old-datom) v)
+        report
+        (-> report
+            (transact-report (datom e a (.-v old-datom) (if keep-history? (datom-tx old-datom) tx) false))
+            (transact-report new-datom)))
+      (transact-report report new-datom)))
+  )
+
+
+
 (defrecord DeleteOp [key]
   op/IOperation
   (-affects-key [_] key)
@@ -172,6 +219,11 @@
 (defn insert
   [tree key value]
   (enqueue tree [(assoc (->InsertOp key value)
+                        :tag (h/uuid))]))
+
+(defn upsert
+  [tree key value]
+  (enqueue tree [(assoc (->UpsertOp key value)
                         :tag (h/uuid))]))
 
 (defn delete
