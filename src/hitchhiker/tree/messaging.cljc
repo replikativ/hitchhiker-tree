@@ -174,6 +174,11 @@
   (enqueue tree [(assoc (->InsertOp key value)
                         :tag (h/uuid))]))
 
+(defn upsert
+  [tree upsertOp]
+  (enqueue tree [(assoc upsertOp 
+                        :tag (h/uuid))]))
+
 (defn delete
   [tree key]
   (enqueue tree [(assoc (->DeleteOp key)

@@ -7,5 +7,5 @@
 
 (defprotocol IOperation
   (-affects-key [op] "Which key this affects--currently must be a single key")
-  (-apply-op-to-coll [op coll] "Applies the operation to the collection")
+  (-apply-op-to-coll [op coll] "Applies the operation to the collection returned by the hitchhiking projection, e.g. lookup iterators.")
   (-apply-op-to-tree [op tree] "Applies the operation to the tree. Returns go-block."))
