@@ -4,11 +4,10 @@
    [clojure.test :refer :all]
    [hitchhiker.tree :as tree]
    [hitchhiker.tree.messaging :as msg]
-   [hitchhiker.tree.backend.testing :refer :all]
-   [hitchhiker.tree.node.testing :refer :all]
-   [hitchhiker.tree.utils.async :refer :all :as ha]
-   [hitchhiker.tree.utils.gc :refer :all :as gc]
+   [hitchhiker.tree.utils.async  :as ha]
+   [hitchhiker.tree.utils.gc :as gc]
    [hitchhiker.tree.bootstrap.konserve :as kons]
+   [clojure.data :refer [diff]]
    [konserve.core :as k]
    [konserve.cache :as kc]
    [konserve.gc :refer [sweep!]]
@@ -17,61 +16,44 @@
 
 (deftest hitchhiker-tree-gc-test
   (testing "Test the GC."
-    #_(let [folder "/tmp/hh-tree-gc"
-          _      (delete-store folder)
-          store (kons/add-hitchhiker-tree-handlers
-                 (kc/ensure-cache (async/<!! (new-fs-store folder :config {:fsync false}))))
-          backend (kons/->KonserveBackend store)
-          flushed (ha/<?? (tree/flush-tree
-                           (time (reduce (fn [t i]
-                                           (ha/<?? (msg/insert t i i)))
-                                         (ha/<?? (tree/b-tree (core/->Config 1 3 (- 3 1))))
-                                         (range 1 11)))
-                           backend))
-          flushed-second (ha/<?? (core/flush-tree
-                                  (time (reduce (fn [t i]
-                                                  (ha/<?? (msg/insert t i i)))
-                                                (ha/<?? (core/b-tree (core/->Config 1 3 (- 3 1))))
-                                                (range 12 21)))
-                                  backend))
-          root-key (kons/get-root-key (:tree flushed))]
-      (let [ts        (java.util.Date.)
-            whitelist (gc/mark #{root-key})]
+    (let [folder           "/tmp/hh-tree-gc"
+          _                (delete-store folder)
+          store            (kons/add-hitchhiker-tree-handlers
+                            (kc/ensure-cache (async/<!! (new-fs-store folder))))
+          backend          (kons/->KonserveBackend store)
+          flushed          (ha/<?? (tree/flush-tree
+                                    (time (reduce (fn [t i]
+                                                    (ha/<?? (msg/insert t i i)))
+                                                  (ha/<?? (tree/b-tree (tree/->Config 2 3 (- 3 2))))
+                                                  (range 1 11)))
+                                    backend))
+          root-key         (kons/get-root-key (:tree flushed))
+          root-node        (ha/<?? (kons/create-tree-from-root-key store root-key))
+          flushed-second   (ha/<?? (tree/flush-tree
+                                    (time (reduce (fn [t i]
+                                                    (ha/<?? (msg/insert t i i)))
+                                                  (:tree flushed)
+                                                  (range 11 21)))
+                                    backend))
+          root-key-second  (kons/get-root-key (:tree flushed-second))
+          root-node-second (ha/<?? (kons/create-tree-from-root-key store root-key-second))
 
-        #_(is (= #{:foo2 :foo3} (<!! (sweep! store whitelist ts))))))))
+          ts               (java.util.Date.)
+          whitelist        (async/<!! (gc/mark #{root-node}))
+          whitelist-second (async/<!! (gc/mark #{root-node-second}))
+          removed          (async/<!! (sweep! store whitelist-second ts))
+          ]
+      (is (= removed (first (diff whitelist whitelist-second))))
+      (is (= (set (map :key (async/<!! (k/keys store))))
+             whitelist-second))
+      (is (= (map first (msg/lookup-fwd-iter root-node-second 0))
+             (range 1 21)))
+      ;; check that with empty caches we can still load the data
+      (let [reloaded-store     (kons/add-hitchhiker-tree-handlers
+                                (kc/ensure-cache (async/<!! (new-fs-store folder))))
+            root-node-after-gc (ha/<?? (kons/create-tree-from-root-key reloaded-store root-key-second))]
+        (is (= (map first (msg/lookup-fwd-iter root-node-after-gc 0))
+               (range 1 21)))))))
 
 
-(comment
-  ;; WIP, will become test as soon as konserve key iteration works properly
-  (let [folder           "/tmp/hh-tree-gc"
-        _                (delete-store folder)
-        store            (kons/add-hitchhiker-tree-handlers
-                          (kc/ensure-cache (async/<!! (new-fs-store folder))))
-        backend          (kons/->KonserveBackend store)
-        flushed          (ha/<?? (tree/flush-tree
-                                  (time (reduce (fn [t i]
-                                                  (ha/<?? (msg/insert t i i)))
-                                                (ha/<?? (tree/b-tree (tree/->Config 2 3 (- 3 2))))
-                                                (range 1 11)))
-                                  backend))
-        root-key         (kons/get-root-key (:tree flushed))
-        root-node        (ha/<?? (kons/create-tree-from-root-key store root-key))
-        flushed-second   (ha/<?? (tree/flush-tree
-                                  (time (reduce (fn [t i]
-                                                  (ha/<?? (msg/insert t i i)))
-                                                (:tree flushed)
-                                                (range 12 21)))
-                                  backend))
-        root-key-second  (kons/get-root-key (:tree flushed-second))
-        root-node-second (ha/<?? (kons/create-tree-from-root-key store root-key-second))
 
-        ]
-    (let [ts               (java.util.Date.)
-          whitelist        (gc/mark #{root-node})
-          whitelist-second (gc/mark #{root-node-second})]
-      #_(count whitelist-second)
-      #_(map first (msg/lookup-fwd-iter root-node 0))
-      #_(async/<!! (sweep! store whitelist ts))
-      #_whitelist
-      (async/<!! (k/keys store))
-      #_(is (= #{:foo2 :foo3} (<!! (sweep! store whitelist ts)))))))
