@@ -18,6 +18,6 @@
                               (ha/<? (n/-resolve-chan node)))
                  new-nodes  (when (hh/index-node? node)
                               (:children node))]
-             (recur (concat r new-nodes)
+             (recur (into r new-nodes)
                     (conj visited (kons/get-root-key node))))
            visited)))))

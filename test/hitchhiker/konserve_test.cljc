@@ -7,10 +7,11 @@
             [clojure.test.check.clojure-test #?(:clj :refer :cljs :refer-macros) [defspec]]
             [clojure.test.check.generators :as gen :include-macros true]
             [clojure.test.check.properties :as prop :include-macros true]
-            [konserve.filestore :refer [new-fs-store delete-store list-keys]]
+            [konserve.filestore :refer [new-fs-store delete-store]]
             [konserve.memory :refer [new-mem-store]]
             [hitchhiker.tree.bootstrap.konserve :as kons]
             [konserve.cache :as kc]
+            [konserve.core :as k]
             [hasch.core :as hasch]
             [hitchhiker.tree :as core]
             [hitchhiker.tree.utils.async :as ha :include-macros true]
@@ -99,6 +100,23 @@
          (delete-store folder)))))
 
 
+
+(let [folder   "/tmp/async-hitchhiker-tree-test"
+      _        (delete-store folder)
+      store    (kons/add-hitchhiker-tree-handlers
+             (kc/ensure-cache (async/<!! (new-mem-store))))
+      backend  (kons/->KonserveBackend store)
+      flushed  (ha/<?? (core/flush-tree
+                       (time (reduce (fn [t i]
+                                       (ha/<?? (msg/insert t i i)))
+                                     (ha/<?? (core/b-tree (core/->Config 1 3 (- 3 1))))
+                                     (range 1 11)))
+                       backend))
+      root-key (kons/get-root-key (:tree flushed))
+      tree     (ha/<?? (kons/create-tree-from-root-key store root-key))]
+  (ha/<?? (msg/lookup tree -10)))
+
+
 ;; ;; adapted from redis tests
 
 (defn insert
@@ -113,7 +131,7 @@
                 (kc/ensure-cache
                  #?(:clj (async/<!! (new-fs-store folder :config {:fsync false}))
                     :cljs (async/<! (new-mem-store)))))
-         _ #?(:clj (assert (empty? (async/<!! (list-keys store)))
+         _ #?(:clj (assert (empty? (async/<!! (k/keys store)))
                            "Start with no keys")
               :cljs nil)
                                         ;_ (swap! recorded-ops conj ops)
