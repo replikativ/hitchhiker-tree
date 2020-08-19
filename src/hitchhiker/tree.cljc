@@ -515,17 +515,17 @@
      "Takes the result of a search and puts the iterated elements onto iter-ch
   going forward over the tree as needed. Does lg(n) backtracking sometimes."
      [iter-ch path start-key]
-     (ha/go-try
-      (loop [path path]
-        (if path
-          (let [start-node (peek path)
-                elements (subseq (:children start-node)
-                                 >=
-                                 start-key)]
-            (ha/<? (async/onto-chan iter-ch
-                                    elements false))
-            (recur (ha/<? (right-successor (pop path)))))
-          (async/close! iter-ch)))))
+      (ha/go-try
+          (loop [path path]
+            (if path
+              (let [start-node (peek path)
+                    elements (subseq (:children start-node)
+                                     >=
+                                     start-key)]
+                (ha/<? (async/onto-chan iter-ch
+                                        elements false))
+                (recur (ha/<? (right-successor (pop path)))))
+              (async/close! iter-ch)))))
 
    #?(:clj
       (defn lookup-fwd-iter
