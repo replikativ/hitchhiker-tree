@@ -186,8 +186,7 @@
        nil
        (-compare [^java.lang.Null key1 key2]
                  (- (n/-order-on-edn-types key2)
-                    (n/-order-on-edn-types key1)))
-       ]
+                    (n/-order-on-edn-types key1)))]
       :cljs
       [number
        (-compare [key1 key2]
@@ -216,5 +215,4 @@
        nil
        (-compare [key1 key2]
                  (- (n/-order-on-edn-types key2)
-                    (n/-order-on-edn-types key1)))
-       ]))
+                    (n/-order-on-edn-types key1)))]))

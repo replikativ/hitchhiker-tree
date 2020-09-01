@@ -41,8 +41,7 @@
           ts               (java.util.Date.)
           whitelist        (async/<!! (gc/mark #{root-node}))
           whitelist-second (async/<!! (gc/mark #{root-node-second}))
-          removed          (async/<!! (sweep! store whitelist-second ts))
-          ]
+          removed          (async/<!! (sweep! store whitelist-second ts))]
       (is (= removed (first (diff whitelist whitelist-second))))
       (is (= (set (map :key (async/<!! (k/keys store))))
              whitelist-second))

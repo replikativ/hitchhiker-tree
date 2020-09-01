@@ -38,7 +38,6 @@
         (ha/<? (async/into [] iter-ch)))
       (msg/forward-iterator path key)))))
 
-
 (deftest simple-konserve-test
   (testing "Insert and lookup"
     #?(:cljs
@@ -99,25 +98,24 @@
            (is (= (ha/<?? (msg/lookup tree 4)) 4)))
          (delete-store folder)))))
 
-
-
 (let [folder   "/tmp/async-hitchhiker-tree-test"
       _        (delete-store folder)
       store    (kons/add-hitchhiker-tree-handlers
-             (kc/ensure-cache (async/<!! (new-mem-store))))
+                (kc/ensure-cache (async/<!! (new-mem-store))))
       backend  (kons/->KonserveBackend store)
       flushed  (ha/<?? (core/flush-tree
-                       (time (reduce (fn [t i]
-                                       (ha/<?? (msg/insert t i i)))
-                                     (ha/<?? (core/b-tree (core/->Config 1 3 (- 3 1))))
-                                     (range 1 11)))
-                       backend))
+                        (time (reduce (fn [t i]
+                                        (ha/<?? (msg/insert t i i)))
+                                      (ha/<?? (core/b-tree (core/->Config 1 3 (- 3 1))))
+                                      (range 1 11)))
+                        backend))
       root-key (kons/get-root-key (:tree flushed))
       tree     (ha/<?? (kons/create-tree-from-root-key store root-key))]
   (ha/<?? (msg/lookup tree -10)))
 
 
 ;; ;; adapted from redis tests
+
 
 (defn insert
   [t k]
@@ -163,7 +161,6 @@
                  (is (ha/<? (ops-test ops 1000)))
                  (recur r)))
              (done)))))
-
 
 #?(:clj
    (defn mixed-op-seq

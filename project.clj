@@ -46,12 +46,11 @@
                 :compiler {:main hitchhiker.tree.core
                            :asset-path "js/out"
                            :output-to "resources/public/js/core.js"
-                           :output-dir "resources/public/js/out" }}
+                           :output-dir "resources/public/js/out"}}
                ;; inspired by datascript project.clj
                {:id "test"
                 :source-paths ["src" "test"]
-                :compiler {
-                           :main          hitchhiker.konserve-test
+                :compiler {:main          hitchhiker.konserve-test
                            :output-to     "target/test.js"
                            :output-dir    "target/none"
                            :optimizations :none

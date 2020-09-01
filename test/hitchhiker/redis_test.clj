@@ -58,7 +58,6 @@
                     (assert res (str "These are unequal: " (pr-str b-tree-order) " " (pr-str (seq (sort set)))))
                     res))))
 
-
 (comment
   (defspec test-many-keys-bigger-trees
     100
@@ -66,13 +65,12 @@
 
   (test-many-keys-bigger-trees)
 
-
   (count (remove  (reduce (fn [t [op x]]
                             (let [x-reduced (when x (mod x 1000))]
                               (condp =
-                                :flush t
-                                :add (conj t x-reduced)
-                                :del (disj t x-reduced))))
+                                     :flush t
+                                     :add (conj t x-reduced)
+                                     :del (disj t x-reduced))))
                           #{}
                           (drop-last 2 opseq)) (lookup-fwd-iter (msg/delete test-tree -33) 0)))
   (:op-buf test-tree)
@@ -103,8 +101,7 @@
                     (take-last  125)
                     first))
       (println (lookup-fwd-iter b-tree -1))
-      (println (sort s))
-      ))
+      (println (sort s))))
   (defn trial []
     (let [opseq (read-string (slurp "broken-data.edn"))
           [b-tree root] (reduce (fn [[t root] [op x]]
@@ -118,8 +115,7 @@
                                                [t @(:storage-addr t)])
                                       :add (do (println "about to add" x-reduced "...")
                                                (let [x [(insert t x-reduced) root]]
-                                                 (println "added") x
-                                                 ))
+                                                 (println "added") x))
                                       :del (do (println "about to del" x-reduced "...")
                                                (let [x [(msg/delete t x-reduced) root]]
                                                  (println "deled") x)))))
@@ -139,6 +135,5 @@
       (def my-root root)))
 
   (map #(and (second %) (mod (second %) 1000)) opseq)
-
 
   (def opseq (read-string (io/resource "redis_test_data.clj"))))

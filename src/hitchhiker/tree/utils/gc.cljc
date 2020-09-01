@@ -9,15 +9,15 @@
   mark phase of a garbage collector."
   ([gc-roots]
    (ha/go-try
-       (loop [to-visit gc-roots
-              visited  #{}]
-         (if-let [to-visit (seq to-visit)]
-           (let [[node & r] to-visit
-                 node       (if (hh/resolved? node)
-                              node
-                              (ha/<? (n/-resolve-chan node)))
-                 new-nodes  (when (hh/index-node? node)
-                              (:children node))]
-             (recur (into r new-nodes)
-                    (conj visited (kons/get-root-key node))))
-           visited)))))
+    (loop [to-visit gc-roots
+           visited  #{}]
+      (if-let [to-visit (seq to-visit)]
+        (let [[node & r] to-visit
+              node       (if (hh/resolved? node)
+                           node
+                           (ha/<? (n/-resolve-chan node)))
+              new-nodes  (when (hh/index-node? node)
+                           (:children node))]
+          (recur (into r new-nodes)
+                 (conj visited (kons/get-root-key node))))
+        visited)))))

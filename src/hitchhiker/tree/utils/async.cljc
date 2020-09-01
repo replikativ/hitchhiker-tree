@@ -40,20 +40,20 @@
   {:style/indent 1}
   [& body]
   (if-async?
-      `(async/go
-         (try
-           ~@body
-           (catch #?(:clj Exception :cljs js/Error) e#
-             e#)))
-    `(do ~@body)))
+   `(async/go
+      (try
+        ~@body
+        (catch #?(:clj Exception :cljs js/Error) e#
+          e#)))
+   `(do ~@body)))
 
 (defmacro <?
   "Same as core.async <! but throws an exception if the channel returns a
   throwable error."
   [ch]
   (if-async?
-      `(throw-if-exception (async/<! ~ch))
-    ch))
+   `(throw-if-exception (async/<! ~ch))
+   ch))
 
 #?(:clj
    (defmacro <??
@@ -61,8 +61,8 @@
   throwable error."
      [ch]
      (if-async?
-         `(throw-if-exception (async/<!! ~ch))
-       ch)))
+      `(throw-if-exception (async/<!! ~ch))
+      ch)))
 
 (defn reduce<
   "Reduces over a sequence s with a go function go-f given the initial value
