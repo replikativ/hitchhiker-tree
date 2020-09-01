@@ -1,0 +1,15 @@
+{:paths ["src"]
+ :deps {org.clojure/clojure         {:mvn/version "1.10.1"}
+        org.clojure/clojurescript   {:mvn/version "1.10.741"}
+        org.clojure/core.rrb-vector {:mvn/version "0.0.14"}
+        org.clojure/core.cache      {:mvn/version "0.7.2"}
+        com.taoensso/carmine        {:mvn/version "2.12.2"}
+        io.replikativ/konserve      {:git/url "https://github.com/groundedSAGE/konserve.git"
+                                     :sha "408cfb2b2ddbdb02f310a69a9540c5578ea31deb"}}
+ :aliases {:cljs {:extra-deps {thheller/shadow-cljs {:mvn/version "2.10.21"}
+                               binaryage/devtools   {:mvn/version "1.0.2"}}
+                  :extra-paths ["test"]}
+           :dev  {:extra-deps {criterium                {:mvn/version "0.4.4"}}}
+           :test {:extra-deps {lambdaisland/kaocha      {:mvn/version "1.0.641"}
+                               org.clojure/test.check   {:mvn/version "0.9.0"}}
+                  :extra-paths ["test"]}}}
