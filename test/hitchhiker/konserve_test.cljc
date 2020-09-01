@@ -1,5 +1,6 @@
 (ns hitchhiker.konserve-test
   (:refer-clojure :exclude [vec])
+  #?(:cljs (:require-macros [hitchhiker.tree.utils.async :refer [go-try if-async? <?]]))
   (:require [clojure.core.rrb-vector :refer [catvec vec]]
             [#?(:clj clojure.test :cljs cljs.test)
              #?(:clj :refer :cljs :refer-macros) [deftest testing run-tests is
@@ -7,25 +8,21 @@
             [clojure.test.check.clojure-test #?(:clj :refer :cljs :refer-macros) [defspec]]
             [clojure.test.check.generators :as gen :include-macros true]
             [clojure.test.check.properties :as prop :include-macros true]
-            [konserve.filestore :refer [new-fs-store delete-store]]
+            #?(:clj [konserve.filestore :refer [new-fs-store delete-store]])
             [konserve.memory :refer [new-mem-store]]
             [hitchhiker.tree.bootstrap.konserve :as kons]
             [konserve.cache :as kc]
             [konserve.core :as k]
             [hasch.core :as hasch]
             [hitchhiker.tree :as core]
-            [hitchhiker.tree.utils.async :as ha :include-macros true]
+            [hitchhiker.tree.utils.async :as ha]
             [hitchhiker.tree.messaging :as msg]
             [hitchhiker.ops :refer [recorded-ops]]
-            #?(:cljs [cljs.core.async :refer [promise-chan] :as async]
-               :clj [clojure.core.async :refer [promise-chan] :as async])
-            #?(:cljs [cljs.nodejs :as nodejs])
-            [clojure.string :as str]))
+            [clojure.core.async :as async]
 
-#?(:cljs
-   (do
-     (nodejs/enable-util-print!)
-     (enable-console-print!)))
+            [clojure.string :as str]
+            ;#?(:cljs [konserve.indexeddb :refer [new-indexeddb-store]])
+            ))
 
 (defn iter-helper [tree key]
   (ha/go-try
@@ -43,8 +40,8 @@
     #?(:cljs
        (async done
               (ha/go-try
-               (let [folder "/tmp/async-hitchhiker-tree-test"
-                     _ (delete-store folder)
+               (let [;folder "/tmp/async-hitchhiker-tree-test"
+                     ;_ (delete-store folder)
                      store (kons/add-hitchhiker-tree-handlers
                             (kc/ensure-cache (async/<!
                                               (new-mem-store)
@@ -68,7 +65,7 @@
                    (is (= (ha/<? (msg/lookup tree 2)) 2))
                    (is (= (ha/<? (msg/lookup tree 3)) nil))
                    (is (= (ha/<? (msg/lookup tree 4)) 4)))
-                 (delete-store folder)
+                  ;(delete-store folder)
                  (done)))))
     #?(:clj
        (let [folder "/tmp/async-hitchhiker-tree-test"
@@ -97,23 +94,6 @@
            (is (= (ha/<?? (msg/lookup tree 3)) nil))
            (is (= (ha/<?? (msg/lookup tree 4)) 4)))
          (delete-store folder)))))
-
-(let [folder   "/tmp/async-hitchhiker-tree-test"
-      _        (delete-store folder)
-      store    (kons/add-hitchhiker-tree-handlers
-                (kc/ensure-cache (async/<!! (new-mem-store))))
-      backend  (kons/->KonserveBackend store)
-      flushed  (ha/<?? (core/flush-tree
-                        (time (reduce (fn [t i]
-                                        (ha/<?? (msg/insert t i i)))
-                                      (ha/<?? (core/b-tree (core/->Config 1 3 (- 3 1))))
-                                      (range 1 11)))
-                        backend))
-      root-key (kons/get-root-key (:tree flushed))
-      tree     (ha/<?? (kons/create-tree-from-root-key store root-key))]
-  (ha/<?? (msg/lookup tree -10)))
-
-
 ;; ;; adapted from redis tests
 
 
@@ -149,7 +129,6 @@
            res (= b-tree-order (seq (sort set)))]
        (assert res (str "These are unequal: " (pr-str b-tree-order) " " (pr-str (seq (sort set)))))
        res))))
-
 ;; TODO recheck when https://dev.clojure.org/jira/browse/TCHECK-128 is fixed
 ;; and share clj mixed-op-seq test, remove ops.cljc then.
 #?(:cljs
@@ -174,19 +153,3 @@
                                                            (gen/no-shrink gen/int))]])
                                     num-ops)]
                    (ha/<?? (ops-test ops universe-size)))))
-
-
-;; #?(:clj
-;;    (defspec test-many-keys-bigger-trees
-;;      100
-;;      (mixed-op-seq 800 200 10 1000 1000)))
-
-
-#?(:cljs
-   (defn ^:export test-all [cb]
-     (defmethod cljs.test/report [:cljs.test/default :end-run-tests] [m]
-       (cb (clj->js m))
-       (if (cljs.test/successful? m)
-         (println "Success!")
-         (println "FAIL")))
-     (run-tests)))

@@ -1,19 +1,18 @@
 (ns hitchhiker.tree.utils.async
-  (:require
-   [hitchhiker.tree.utils.platform :as platform]
-   #?(:clj [clojure.core.async :as async]
-      :cljs [cljs.core.async :as async :include-macros true])))
+  #?(:cljs (:require-macros [hitchhiker.tree.utils.async :refer [go-try <? if-async?]]))
+  (:require #?(:clj [hitchhiker.tree.utils.platform])
+            [clojure.core.async :as async :refer [go]]))
 
-(def ^:dynamic *async?*
-  #?(:clj false :cljs true))
+(def ^:dynamic *async?* true)
 
 (defmacro if-async?
   ""
   {:style/indent 2}
   [then else]
-  (if *async?*
-    then
-    else))
+  (let [cljs? (boolean (:ns &env))]
+    (if (or *async?* cljs?)
+      then
+      else)))
 
 (defn throw-if-exception
   "Helper method that checks if x is Exception and if yes, wraps it in a new
@@ -40,11 +39,11 @@
   {:style/indent 1}
   [& body]
   (if-async?
-   `(async/go
-      (try
-        ~@body
-        (catch #?(:clj Exception :cljs js/Error) e#
-          e#)))
+   (let [e (if (:ns &env) 'js/Error Throwable)]
+     `(async/go
+        (try
+          (do ~@body)
+          (catch ~e e# e#))))
    `(do ~@body)))
 
 (defmacro <?

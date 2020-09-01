@@ -1,5 +1,7 @@
 (ns hitchhiker.tree.messaging
   (:refer-clojure :exclude [subvec])
+  #?(:cljs (:require-macros [hitchhiker.tree.utils.async :refer [go-try <? if-async?]]
+                            [hitchhiker.tree :refer [<?-resolve]]))
   (:require
    [hitchhiker.tree.utils.async :as ha]
    [hitchhiker.tree.op :as op]
@@ -7,9 +9,8 @@
    [hitchhiker.tree.key-compare :as c]
    [clojure.core.rrb-vector :as rrb]
    [hasch.core :as h]
-   [hitchhiker.tree :as tree :include-macros true]
-   #?@(:clj [[clojure.core.async :as async]]
-       :cljs [[cljs.core.async :as async]])))
+   [hitchhiker.tree :as tree]
+   [clojure.core.async :as async]))
 
 (defrecord InsertOp [key value]
   op/IOperation
@@ -191,7 +192,7 @@
           (let [elements (drop-while (fn [[k v]]
                                        (neg? (c/-compare k start-key)))
                                      (apply-ops-in-path path))]
-            (ha/<? (async/onto-chan iter-ch elements false))
+            (ha/<? (async/onto-chan! iter-ch elements false))
             (recur (ha/<? (tree/right-successor (pop path)))))
           (async/close! iter-ch)))))
 
@@ -226,5 +227,4 @@
          (drop-while (fn [[k v]]
                        (neg? (c/-compare k key)))
                      (forward-iterator path)))))))
-
 

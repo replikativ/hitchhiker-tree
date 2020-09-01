@@ -15,14 +15,15 @@
 
   * The 'stats' object must be convertible to a summary or whatever at the end"
   (:refer-clojure :exclude [subvec])
+  #?(:cljs (:require-macros [hitchhiker.tree :refer [<?-resolve]]
+                            [hitchhiker.tree.utils.async :refer [go-try <? if-async?]]))
   (:require
-   [hitchhiker.tree.utils.async :as ha :include-macros true]
+   [hitchhiker.tree.utils.async :as ha]
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.backend :as b]
    [hitchhiker.tree.key-compare :as c]
    [clojure.core.rrb-vector :refer [catvec subvec]]
-   #?(:clj [clojure.core.async :as async]
-      :cljs [cljs.core.async :as async :include-macros true])))
+   [clojure.core.async :as async]))
 
 (defrecord Config [index-b data-b op-buf-size])
 
@@ -465,8 +466,8 @@
                                     catvec))
             cleaned-node (assoc tree :children cleaned-children)
             new-addr (ha/<? (b/-write-node backend cleaned-node stats))]
-        (async/>!! (:storage-addr tree)
-                   new-addr)
+        (async/offer! (:storage-addr tree)
+                      new-addr)
         new-addr)
       tree))))
 
@@ -503,8 +504,8 @@
         (if root-node?
           cleaned-node
           (let [new-addr (ha/<? (b/-write-node backend cleaned-node stats))]
-            (async/>!! (:storage-addr tree)
-                       new-addr)
+            (async/offer! (:storage-addr tree)
+                          new-addr)
             new-addr)))
       tree))))
 
@@ -521,8 +522,8 @@
                 elements (subseq (:children start-node)
                                  >=
                                  start-key)]
-            (ha/<? (async/onto-chan iter-ch
-                                    elements false))
+            (ha/<? (async/onto-chan! iter-ch
+                                     elements false))
             (recur (ha/<? (right-successor (pop path)))))
           (async/close! iter-ch)))))
 

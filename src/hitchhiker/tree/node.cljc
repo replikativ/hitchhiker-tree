@@ -1,7 +1,8 @@
 (ns hitchhiker.tree.node
   #?(:cljs (:refer-clojure :exclude [-lookup]))
+  #?(:clj (:refer-clojure :exclude [satisfies?]))
   (:require
-   [hitchhiker.tree.utils.platform :as p]
+   #?(:clj [hitchhiker.tree.utils.platform :refer [satisfies?]])
    [hitchhiker.tree.utils.async]))
 
 (defprotocol IEDNOrderable
@@ -21,10 +22,13 @@
   (-lookup [node k] "Returns the child node which contains the given key"))
 
 ;; marker protocols
-(defprotocol IDataNode)
-(defprotocol IIndexNode)
-(defprotocol IResolved)
+(defprotocol IDataNode
+  (-foo1 [node] "Does nothing"))
+(defprotocol IIndexNode
+  (-foo2 [node] "Does nothing"))
+(defprotocol IResolved
+  (-foo3 [node] "Does nothing"))
 
 (defn address?
   [node]
-  (p/satisfies? IAddress node))
+  (satisfies? IAddress node))
