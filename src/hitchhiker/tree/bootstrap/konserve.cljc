@@ -4,11 +4,13 @@
    [konserve.cache :as k]
    [hasch.core :as h]
    [hitchhiker.tree.messaging :as msg]
-   [hitchhiker.tree :as tree]
+   #?(:clj [hitchhiker.tree :as tree]
+      :cljs [hitchhiker.tree-cljs :as tree])
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.backend :as b]
    [hitchhiker.tree.key-compare :as c]
-   [hitchhiker.tree.utils.async :as ha]
+   [#?(:clj hitchhiker.tree.utils.clojure.async
+       :cljs hitchhiker.tree.utils.cljs.async) :as ha]
    [clojure.core.async :as async]
    #?(:clj [clojure.core.cache :as cache]
       :cljs [cljs.cache :as cache])))

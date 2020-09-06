@@ -27,7 +27,7 @@
   (:require
    [clojure.core.cache :as cache]
    [clojure.string :as str]
-   [hitchhiker.tree.utils.async :as ha]
+   [hitchhiker.tree.utils.clojure.async :as ha]
    [hitchhiker.tree :as tree]
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.op :as op]

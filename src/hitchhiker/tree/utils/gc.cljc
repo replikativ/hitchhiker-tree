@@ -2,7 +2,8 @@
   (:require [hitchhiker.tree :as hh]
             [hitchhiker.tree.node :as n]
             [hitchhiker.tree.bootstrap.konserve :as kons]
-            [hitchhiker.tree.utils.async :as ha]))
+            [#?(:clj hitchhiker.tree.utils.clojure.async
+                :cljs hitchhiker.tree.utils.cljs.async) :as ha]))
 
 (defn mark
   "Return a set of all addresses reachable from gc-roots, corresponding to the

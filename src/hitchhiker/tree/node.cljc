@@ -2,8 +2,7 @@
   #?(:cljs (:refer-clojure :exclude [-lookup]))
   #?(:clj (:refer-clojure :exclude [satisfies?]))
   (:require
-   #?(:clj [hitchhiker.tree.utils.platform :refer [satisfies?]])
-   [hitchhiker.tree.utils.async]))
+   #?(:clj [hitchhiker.tree.utils.platform :refer [satisfies?]])))
 
 (defprotocol IEDNOrderable
   (-order-on-edn-types [t]))

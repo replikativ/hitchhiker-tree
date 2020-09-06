@@ -1,7 +1,6 @@
-(ns hitchhiker.tree.utils.async
-  #?(:cljs (:require-macros [hitchhiker.tree.utils.async :refer [go-try <? if-async?]]))
+(ns hitchhiker.tree.utils.clojure.async
   (:require #?(:clj [hitchhiker.tree.utils.platform])
-            [clojure.core.async :as async :refer [go]]))
+            [clojure.core.async :as async]))
 
 (def ^:dynamic *async?* false)
 
@@ -9,10 +8,9 @@
   ""
   {:style/indent 2}
   [then else]
-  (let [cljs? (boolean (:ns &env))]
-    (if (or *async?* cljs?)
-      then
-      else)))
+  (if *async?* 
+       then
+       else))
 
 (defn throw-if-exception
   "Helper method that checks if x is Exception and if yes, wraps it in a new

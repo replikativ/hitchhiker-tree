@@ -1,15 +1,15 @@
 (ns hitchhiker.tree.messaging
   (:refer-clojure :exclude [subvec])
-  #?(:cljs (:require-macros [hitchhiker.tree.utils.async :refer [go-try <? if-async?]]
-                            [hitchhiker.tree :refer [<?-resolve]]))
   (:require
-   [hitchhiker.tree.utils.async :as ha]
+   [#?(:clj hitchhiker.tree.utils.clojure.async
+       :cljs hitchhiker.tree.utils.cljs.async) :as ha]
    [hitchhiker.tree.op :as op]
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.key-compare :as c]
    [clojure.core.rrb-vector :as rrb]
    [hasch.core :as h]
-   [hitchhiker.tree :as tree]
+   #?(:clj [hitchhiker.tree :as tree]
+      :cljs [hitchhiker.tree-cljs :as tree])
    [clojure.core.async :as async]))
 
 (defrecord InsertOp [key value]

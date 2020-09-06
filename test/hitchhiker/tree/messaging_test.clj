@@ -3,7 +3,7 @@
    [clojure.test.check.clojure-test :refer [defspec]]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
-   [hitchhiker.tree.utils.async :as ha]
+   [hitchhiker.tree.utils.clojure.async :as ha]
    [hitchhiker.tree.key-compare :as kc]
    [hitchhiker.tree :as tree]
    [hitchhiker.tree.core-test]

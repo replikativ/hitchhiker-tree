@@ -19,3 +19,4 @@ node_modules
 resources/public
 public
 .calva
+out

@@ -4,9 +4,8 @@
             [excel-templates.build :as excel]
             [hitchhiker.tree.bootstrap.redis :as redis]
             [hitchhiker.tree.backend.testing]
-            [hitchhiker.tree.utils.async :refer [<?? <?] :as ha]
             [hitchhiker.tree :as core]
-            [hitchhiker.tree.utils.async :as ha :refer [<?? <? go-try]]
+            [hitchhiker.tree.utils.clojure.async :as ha :refer [<?? <? go-try]]
             [hitchhiker.tree.messaging :as msg])
   (:import [java.io File FileWriter]))
 

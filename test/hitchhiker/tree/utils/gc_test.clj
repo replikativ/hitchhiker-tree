@@ -4,7 +4,7 @@
    [clojure.test :refer :all]
    [hitchhiker.tree :as tree]
    [hitchhiker.tree.messaging :as msg]
-   [hitchhiker.tree.utils.async  :as ha]
+   [hitchhiker.tree.utils.clojure.async  :as ha]
    [hitchhiker.tree.utils.gc :as gc]
    [hitchhiker.tree.bootstrap.konserve :as kons]
    [clojure.data :refer [diff]]

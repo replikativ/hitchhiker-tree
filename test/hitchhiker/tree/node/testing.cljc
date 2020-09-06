@@ -1,8 +1,10 @@
 (ns hitchhiker.tree.node.testing
   (:require
-   [hitchhiker.tree.utils.async :as ha]
+   [#?(:clj hitchhiker.tree.utils.clojure.async
+       :cljs hitchhiker.tree.utils.cljs.async) :as ha]
    [hitchhiker.tree.node :as n]
-   [hitchhiker.tree :as tree]))
+   #?(:clj [hitchhiker.tree :as tree]
+      :cljs [hitchhiker.tree-cljs :as tree])))
 
 (defrecord TestingAddr [last-key node resolve-ch]
   n/IAddress

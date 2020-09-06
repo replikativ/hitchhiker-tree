@@ -4,11 +4,11 @@
             [clojure.test.check.properties :as prop]
             [hitchhiker.tree.bootstrap.redis :as redis]
             [hitchhiker.tree :as core]
-            [hitchhiker.tree.utils.async :as ha]
+            [hitchhiker.tree.utils.clojure.async :as ha]
             hitchhiker.tree.core-test
             [hitchhiker.tree.messaging :as msg]
             [taoensso.carmine :as car :refer [wcar]]))
-
+#_()
 (defn insert
   [t k]
   (msg/insert t k k))

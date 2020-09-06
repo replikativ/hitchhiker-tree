@@ -10,7 +10,7 @@
    [hitchhiker.tree.backend.testing :refer :all]
    [hitchhiker.tree.node.testing :refer :all]
    [hitchhiker.tree.node :as n]
-   [hitchhiker.tree.utils.async :refer :all :as ha]
+   [hitchhiker.tree.utils.clojure.async :refer :all :as ha]
    [clojure.core.async  :as async]))
 
 (deftest reduce<-test

@@ -15,10 +15,8 @@
 
   * The 'stats' object must be convertible to a summary or whatever at the end"
   (:refer-clojure :exclude [subvec])
-  #?(:cljs (:require-macros [hitchhiker.tree :refer [<?-resolve]]
-                            [hitchhiker.tree.utils.async :refer [go-try <? if-async?]]))
   (:require
-   [hitchhiker.tree.utils.async :as ha]
+   [hitchhiker.tree.utils.clojure.async :as ha]
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.backend :as b]
    [hitchhiker.tree.key-compare :as c]
@@ -55,8 +53,7 @@
 (defn <-cache
   [cache calc-fn]
   (let [c @cache]
-    (if (#?(:clj identical?
-            :cljs keyword-identical?)
+    (if (identical?
          c ::nothing)
       (vreset! cache (calc-fn))
       c)))
@@ -131,8 +128,7 @@
           a (object-array l)
           _ (dotimes [i l]
               (aset a i (n/-last-key (nth children i))))
-          x #?(:clj (java.util.Arrays/binarySearch a 0 l k c/-compare)
-               :cljs (goog.array/binarySearch a k c/-compare))]
+          x (java.util.Arrays/binarySearch a 0 l k c/-compare)]
       (if (neg? x)
         (- (inc x))
         x))))
@@ -214,12 +210,9 @@
                cfg))
 
   (-lookup [root k]
-    (let [x #?(:clj (java.util.Collections/binarySearch (vec (keys children))
-                                                        k
-                                                        c/-compare)
-               :cljs (goog.array/binarySearch (into-array (keys children))
-                                              k
-                                              c/-compare))]
+    (let [x (java.util.Collections/binarySearch (vec (keys children))
+                                                k
+                                                c/-compare)]
       (if (neg? x)
         (- (inc x))
         x))))
@@ -527,17 +520,16 @@
             (recur (ha/<? (right-successor (pop path)))))
           (async/close! iter-ch)))))
 
-   #?(:clj
-      (defn lookup-fwd-iter
-        "Compatibility helper to clojure sequences. Please prefer the channel
+   (defn lookup-fwd-iter
+     "Compatibility helper to clojure sequences. Please prefer the channel
   interface of forward-iterator, as this function blocks your thread, which
   disturbs async contexts and might lead to poor performance. It is mainly here
   to facilitate testing."
-        [tree key]
-        (let [path (ha/<?? (lookup-path tree key))
-              iter-ch (async/chan)]
-          (forward-iterator iter-ch path key)
-          (ha/chan-seq iter-ch)))))
+     [tree key]
+     (let [path (ha/<?? (lookup-path tree key))
+           iter-ch (async/chan)]
+       (forward-iterator iter-ch path key)
+       (ha/chan-seq iter-ch))))
  ;; else
  (do
    (defn forward-iterator

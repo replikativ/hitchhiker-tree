@@ -1,6 +1,6 @@
 (ns hitchhiker.konserve-test
   (:refer-clojure :exclude [vec])
-  #?(:cljs (:require-macros [hitchhiker.tree.utils.async :refer [go-try if-async? <?]]))
+  ;#?(:cljs (:require-macros [hitchhiker.tree.utils.async :refer [go-try if-async? <?]]))
   (:require [clojure.core.rrb-vector :refer [catvec vec]]
             [#?(:clj clojure.test :cljs cljs.test)
              #?(:clj :refer :cljs :refer-macros) [deftest testing run-tests is
@@ -14,8 +14,11 @@
             [konserve.cache :as kc]
             [konserve.core :as k]
             [hasch.core :as hasch]
-            [hitchhiker.tree :as core]
-            [hitchhiker.tree.utils.async :as ha]
+            #?(:clj [hitchhiker.tree :as core]
+               :cljs [hitchhiker.tree-cljs :as core])
+            ;[hitchhiker.tree :as core]
+            [#?(:clj hitchhiker.tree.utils.clojure.async
+                :cljs hitchhiker.tree.utils.cljs.async) :as ha]
             [hitchhiker.tree.messaging :as msg]
             [hitchhiker.ops :refer [recorded-ops]]
             [clojure.core.async :as async]
