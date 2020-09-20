@@ -4,7 +4,8 @@
    #?(:clj [clojure.core.async :as async]
       :cljs [cljs.core.async :as async :include-macros true])))
 
-(def ^:dynamic *async?* true)
+(def ^:dynamic *async?*
+  #?(:clj false :cljs true))
 
 (defmacro if-async?
   ""
