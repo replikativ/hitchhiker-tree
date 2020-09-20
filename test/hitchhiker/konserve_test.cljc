@@ -1,14 +1,13 @@
 (ns hitchhiker.konserve-test
-  (:refer-clojure :exclude [vec])
-  (:require [clojure.core.rrb-vector :refer [catvec vec]]
-            [#?(:clj clojure.test :cljs cljs.test)
+  (:require [#?(:clj clojure.test :cljs cljs.test)
              #?(:clj :refer :cljs :refer-macros) [deftest testing run-tests is
                                                   #?(:cljs async)]]
             [clojure.test.check.clojure-test #?(:clj :refer :cljs :refer-macros) [defspec]]
             [clojure.test.check.generators :as gen :include-macros true]
             [clojure.test.check.properties :as prop :include-macros true]
-            [konserve.filestore :refer [new-fs-store delete-store list-keys]]
+            [konserve.filestore :refer [new-fs-store delete-store]]
             [konserve.memory :refer [new-mem-store]]
+            [konserve.core :as k]
             [hitchhiker.tree.bootstrap.konserve :as kons]
             [konserve.cache :as kc]
             [hasch.core :as hasch]
@@ -113,7 +112,7 @@
                 (kc/ensure-cache
                  #?(:clj (async/<!! (new-fs-store folder :config {:fsync false}))
                     :cljs (async/<! (new-mem-store)))))
-         _ #?(:clj (assert (empty? (async/<!! (list-keys store)))
+         _ #?(:clj (assert (empty? (async/<!! (k/keys store)))
                            "Start with no keys")
               :cljs nil)
                                         ;_ (swap! recorded-ops conj ops)
