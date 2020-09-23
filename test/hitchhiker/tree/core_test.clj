@@ -10,7 +10,7 @@
    [hitchhiker.tree.backend.testing :refer :all]
    [hitchhiker.tree.node.testing :refer :all]
    [hitchhiker.tree.node :as n]
-   [hitchhiker.tree.utils.async :refer :all :as ha]
+   [hitchhiker.tree.utils.clojure.async :refer :all :as ha]
    [clojure.core.async  :as async]))
 
 (deftest reduce<-test
@@ -46,7 +46,7 @@
         (is (= (<?? (lookup-key root (str (inc i)))) (inc i))))))
   (testing "basic fwd iterator"
     (let [data1 (data-node (sorted-map 1 1 2 2 3 3 4 4 5 5)
-                           (->Config 3 5 2) )
+                           (->Config 3 5 2))
           data2 (data-node (sorted-map 6 6 7 7 8 8 9 9 10 10)
                            (->Config 3 5 2))
           root (index-node [data1 data2]
@@ -109,13 +109,12 @@
                       b-tree-order (lookup-fwd-iter b-tree-without Integer/MIN_VALUE)]
                   (= (seq (remove (set set-b) set-a)) (seq (map first b-tree-order))))))
 
-
 (deftest insert-comparator-test
   (let [root (reduce insert-helper (<?? (b-tree (->Config 3 3 2)))
                      (concat (range 5)
                              [#inst "2020-04-21T09:50:15.257-00:00"
                               #inst "2020-04-21T09:51:15.257-00:00"
-                              #uuid "58cc42f0-ccf7-41de-ab2e-79fc325d51db" 
+                              #uuid "58cc42f0-ccf7-41de-ab2e-79fc325d51db"
                               nil
                               -0.2
                               1.9E10
@@ -128,8 +127,7 @@
                               false
                               "Foo"
                               9N
-                              10.0M
-                              ]))]
+                              10.0M]))]
     (is (= (map second (lookup-fwd-iter root nil))
            '(nil
              #inst "2020-04-21T09:50:15.257-00:00"

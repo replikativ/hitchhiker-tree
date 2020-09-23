@@ -4,7 +4,7 @@
    [clojure.test :refer :all]
    [hitchhiker.tree :as tree]
    [hitchhiker.tree.messaging :as msg]
-   [hitchhiker.tree.utils.async  :as ha]
+   [hitchhiker.tree.utils.clojure.async  :as ha]
    [hitchhiker.tree.utils.gc :as gc]
    [hitchhiker.tree.bootstrap.konserve :as kons]
    [clojure.data :refer [diff]]
@@ -48,11 +48,11 @@
       (is (= (map first (msg/lookup-fwd-iter root-node-second 0))
              (range 1 21)))
       ;; check that with empty caches we can still load the data
-      (let [reloaded-store     (kons/add-hitchhiker-tree-handlers
-                                (kc/ensure-cache (async/<!! (new-fs-store folder))))
-            root-node-after-gc (ha/<?? (kons/create-tree-from-root-key reloaded-store root-key-second))]
-        (is (= (map first (msg/lookup-fwd-iter root-node-after-gc 0))
-               (range 1 21)))))))
+        (let [reloaded-store     (kons/add-hitchhiker-tree-handlers
+                                  (kc/ensure-cache (async/<!! (new-fs-store folder))))
+              root-node-after-gc (ha/<?? (kons/create-tree-from-root-key reloaded-store root-key-second))]
+          (is (= (map first (msg/lookup-fwd-iter root-node-after-gc 0))
+                 (range 1 21)))))))
 
 
 

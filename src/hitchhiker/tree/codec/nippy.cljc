@@ -1,11 +1,14 @@
 (ns hitchhiker.tree.codec.nippy
   (:require
-   [hitchhiker.tree :as tree]
+   #?(:clj [hitchhiker.tree :as tree]
+      :cljs [hitchhiker.tree-cljs :as tree])
    [hitchhiker.tree.node :as n]
    #?(:clj [taoensso.nippy :as nippy])))
 
 
 ;; TODO share with konserve
+
+
 (declare encode)
 
 (defn nilify
@@ -39,7 +42,6 @@
     (tree/data-node? node) (encode-data-node node)
     (n/address? node) (encode-address node)
     :else node))
-
 
 (defonce install*
   (delay

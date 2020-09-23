@@ -9,7 +9,7 @@
    [konserve.cache :as kc]
    [hitchhiker.tree :as tree]
    [hitchhiker.tree.node :as n]
-   [hitchhiker.tree.utils.async :as ha]
+   [hitchhiker.tree.utils.clojure.async :as ha]
    [hitchhiker.tree.messaging :as msg]
    [clojure.core.async  :as async]
    [clojure.string :as str]
@@ -28,7 +28,7 @@
   if any. Weights become edge labels unless a label is specified.
   Labels also include attributes when the graph satisfies AttrGraph."
   [g & {:keys [graph-name node-label edge-label]
-        :or {graph-name "graph"} :as opts }]
+        :or {graph-name "graph"} :as opts}]
   (let [d? (directed? g)
         w? (weighted? g)
         a? (attr? g)
@@ -86,7 +86,6 @@
       (.append sb "\n"))
     (str (doto sb (.append "}")))))
 
-
 (ns hitchhiker.tree.utils.plot)
 
 (def store
@@ -102,7 +101,6 @@
                          (shuffle (range 1 30))))
            (kons/->KonserveBackend store))))
 
-
 (def flushed
   (ha/<?? (tree/flush-tree
            (time (reduce (fn [t i]
@@ -111,16 +109,16 @@
                          (shuffle (range -4 -2))))
            (kons/->KonserveBackend store))))
 
-
-
 (comment
   ;; TODO double root node?
   (do
     (def store (kons/add-hitchhiker-tree-handlers
-                (kc/ensure-cache (ha/<?? (new-mem-store)))) )
+                (kc/ensure-cache (ha/<?? (new-mem-store)))))
 
 
     ;; insertion
+
+
     (def flushed (ha/<?? (tree/flush-tree
                           (time (reduce (fn [t i]
                                           (ha/<?? (msg/insert t i i)))
@@ -128,7 +126,6 @@
                                         (concat (range 1 12)
                                                 #_[0 13 14 -1 15])))
                           (kons/->KonserveBackend store))))
-
 
     (def flushed (ha/<?? (tree/flush-tree
                           (time (reduce (fn [t i]
@@ -148,10 +145,8 @@
                        {id (mapv (fn [c] (:konserve-key c)) children)}
                        {id []}))))))
 
-
 (defn use-record-nodes [g]
   (attr/add-attr-to-nodes g :shape "record" (lg/nodes g)))
-
 
 (defn node-layout [g [id {:keys [children] :as node}]]
   (if (tree/index-node? node)
@@ -172,7 +167,6 @@
     (attr/add-attr
      g id
      :label (str (str/join "|" (map key (:children node)))))))
-
 
 (defn set-node-layouts [g store]
   (->> @(:state store)
@@ -196,36 +190,28 @@
      g
      edges)))
 
-
 (defn create-graph [store]
   (-> (init-graph store)
       use-record-nodes
       (set-node-layouts store)
       (set-edge-layouts store)))
 
-
-
 (comment
   (view (create-graph store))
 
   (println (lio/dot-str g)))
-
-
 
 (defn remove-storage-addrs [[k v]]
   (if (tree/index-node? v)
     [k (-> v
            (dissoc :storage-addr :cfg)
            (update :children (fn [cs] (mapv #(dissoc % :storage-addr :store) cs)))
-           (update :op-buf (fn [cs] (mapv #(into {} %) cs)))
-           )]
+           (update :op-buf (fn [cs] (mapv #(into {} %) cs))))]
     [k (dissoc v :storage-addr :cfg)]))
-
 
 (comment
   (spit "/tmp/sample-tree.json"
         (json/generate-string
          (into {} (map remove-storage-addrs @(:state store)))))
-
 
   (prn (map remove-storage-addrs @(:state store))))

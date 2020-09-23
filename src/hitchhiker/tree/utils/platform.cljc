@@ -2,7 +2,7 @@
   "FIXME would be nice to get rid of that ns"
   (:refer-clojure :exclude [satisfies?]))
 
-#?(:cljs (defn satisfies? [p x] (cljs.core/satisfies? p x))
+#?(:cljs (defn satisfies? [p x] (satisfies? p x))
    :clj
    (def satisfies?
      ;; FIXME for now `(satisfies? IFoo node)` is crippled,

@@ -4,15 +4,16 @@
    [konserve.cache :as k]
    [hasch.core :as h]
    [hitchhiker.tree.messaging :as msg]
-   [hitchhiker.tree :as tree]
+   #?(:clj [hitchhiker.tree :as tree]
+      :cljs [hitchhiker.tree-cljs :as tree])
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.backend :as b]
    [hitchhiker.tree.key-compare :as c]
-   [hitchhiker.tree.utils.async :as ha]
-   #?@(:clj [[clojure.core.async :as async]
-             [clojure.core.cache :as cache]]
-       :cljs [[cljs.core.async :include-macros true :as async]
-              [cljs.cache :as cache]])))
+   [#?(:clj hitchhiker.tree.utils.clojure.async
+       :cljs hitchhiker.tree.utils.cljs.async) :as ha]
+   [clojure.core.async :as async]
+   #?(:clj [clojure.core.cache :as cache]
+      :cljs [cljs.cache :as cache])))
 
 (declare encode)
 
@@ -90,9 +91,8 @@
     (ha/go-try
      (swap! session update-in [:writes] inc)
      (let [pnode (encode node)
-           id (h/uuid pnode)
-           ch (k/assoc-in store [id] node)]
-       (ha/<? ch)
+           id (h/uuid pnode)]
+       (ha/<? (k/assoc-in store [id] node))
        (konserve-addr store
                       (n/-last-key node)
                       id))))
@@ -112,11 +112,10 @@
          val (ha/if-async?
               (ha/<? ch)
               (async/<!! ch))
-         ;; need last key to bootstrap
-            last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
-        (ha/<? (n/-resolve-chan (konserve-addr store
-                                               last-key
-                                               root-key))))))
+         last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
+     (ha/<? (n/-resolve-chan (konserve-addr store
+                                            last-key
+                                            root-key))))))
 
 (defn add-hitchhiker-tree-handlers [store]
   ;; TODO check whether store is using nippy in the future and load on the fly:
@@ -163,9 +162,7 @@
                              (vec op-buf)
                              cfg))
           'hitchhiker.tree.core.Config
-          tree/map->Config
-
-          })
+          tree/map->Config})
   (swap! (:write-handlers store)
          merge
          {'hitchhiker.tree.bootstrap.konserve.KonserveAddr

@@ -1,15 +1,16 @@
 (ns hitchhiker.tree.messaging
   (:refer-clojure :exclude [subvec])
   (:require
-   [hitchhiker.tree.utils.async :as ha]
+   [#?(:clj hitchhiker.tree.utils.clojure.async
+       :cljs hitchhiker.tree.utils.cljs.async) :as ha]
    [hitchhiker.tree.op :as op]
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.key-compare :as c]
    [clojure.core.rrb-vector :as rrb]
    [hasch.core :as h]
-   [hitchhiker.tree :as tree :include-macros true]
-   #?@(:clj [[clojure.core.async :as async]]
-       :cljs [[cljs.core.async :as async]])))
+   #?(:clj [hitchhiker.tree :as tree]
+      :cljs [hitchhiker.tree-cljs :as tree])
+   [clojure.core.async :as async]))
 
 (defrecord InsertOp [key value]
   op/IOperation
@@ -179,7 +180,6 @@
   (enqueue tree [(assoc (->DeleteOp key)
                         :tag (h/uuid))]))
 
-
 (ha/if-async?
  (do
    (defn forward-iterator
@@ -192,7 +192,7 @@
           (let [elements (drop-while (fn [[k v]]
                                        (neg? (c/-compare k start-key)))
                                      (apply-ops-in-path path))]
-            (ha/<? (async/onto-chan iter-ch elements false))
+            (ha/<? (async/onto-chan! iter-ch elements false))
             (recur (ha/<? (tree/right-successor (pop path)))))
           (async/close! iter-ch)))))
 
@@ -209,17 +209,16 @@
           (ha/chan-seq iter-ch)))))
  ;; else
  (do
-  (defn forward-iterator
-      "Takes the result of a search and returns an iterator going
+   (defn forward-iterator
+     "Takes the result of a search and returns an iterator going
    forward over the tree. Does lg(n) backtracking sometimes."
-      [path]
-      (assert (tree/data-node? (peek path)))
-      (let [first-elements (apply-ops-in-path path)
-            next-elements (lazy-seq
-                           (when-let [succ (tree/right-successor (pop path))]
-                             (forward-iterator succ)))]
-        (concat first-elements next-elements)))
-
+     [path]
+     (assert (tree/data-node? (peek path)))
+     (let [first-elements (apply-ops-in-path path)
+           next-elements (lazy-seq
+                          (when-let [succ (tree/right-successor (pop path))]
+                            (forward-iterator succ)))]
+       (concat first-elements next-elements)))
 
    (defn lookup-fwd-iter
      [tree key]
@@ -228,5 +227,4 @@
          (drop-while (fn [[k v]]
                        (neg? (c/-compare k key)))
                      (forward-iterator path)))))))
-
 

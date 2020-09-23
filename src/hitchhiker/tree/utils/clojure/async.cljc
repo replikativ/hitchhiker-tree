@@ -1,19 +1,16 @@
-(ns hitchhiker.tree.utils.async
-  (:require
-   [hitchhiker.tree.utils.platform :as platform]
-   #?(:clj [clojure.core.async :as async]
-      :cljs [cljs.core.async :as async :include-macros true])))
+(ns hitchhiker.tree.utils.clojure.async
+  (:require #?(:clj [hitchhiker.tree.utils.platform])
+            [clojure.core.async :as async]))
 
-(def ^:dynamic *async?*
-  #?(:clj false :cljs true))
+(def ^:dynamic *async?* false)
 
 (defmacro if-async?
   ""
   {:style/indent 2}
   [then else]
-  (if *async?*
-    then
-    else))
+  (if *async?* 
+       then
+       else))
 
 (defn throw-if-exception
   "Helper method that checks if x is Exception and if yes, wraps it in a new
@@ -40,20 +37,20 @@
   {:style/indent 1}
   [& body]
   (if-async?
-      `(async/go
-         (try
-           ~@body
-           (catch #?(:clj Exception :cljs js/Error) e#
-             e#)))
-    `(do ~@body)))
+   (let [e (if (:ns &env) 'js/Error Throwable)]
+     `(async/go
+        (try
+          (do ~@body)
+          (catch ~e e# e#))))
+   `(do ~@body)))
 
 (defmacro <?
   "Same as core.async <! but throws an exception if the channel returns a
   throwable error."
   [ch]
   (if-async?
-      `(throw-if-exception (async/<! ~ch))
-    ch))
+   `(throw-if-exception (async/<! ~ch))
+   ch))
 
 #?(:clj
    (defmacro <??
@@ -61,8 +58,8 @@
   throwable error."
      [ch]
      (if-async?
-         `(throw-if-exception (async/<!! ~ch))
-       ch)))
+      `(throw-if-exception (async/<!! ~ch))
+      ch)))
 
 (defn reduce<
   "Reduces over a sequence s with a go function go-f given the initial value

@@ -13,3 +13,10 @@ pom.xml.asc
 *.swo
 *.swn
 *~
+.cpcache
+.shadow-cljs
+node_modules
+resources/public
+public
+.calva
+out
