@@ -1,8 +1,5 @@
 (ns hitchhiker.konserve-test
-  (:refer-clojure :exclude [vec])
-  ;#?(:cljs (:require-macros [hitchhiker.tree.utils.async :refer [go-try if-async? <?]]))
-  (:require [clojure.core.rrb-vector :refer [catvec vec]]
-            [#?(:clj clojure.test :cljs cljs.test)
+  (:require [#?(:clj clojure.test :cljs cljs.test)
              #?(:clj :refer :cljs :refer-macros) [deftest testing run-tests is
                                                   #?(:cljs async)]]
             [clojure.test.check.clojure-test #?(:clj :refer :cljs :refer-macros) [defspec]]
@@ -10,6 +7,7 @@
             [clojure.test.check.properties :as prop :include-macros true]
             #?(:clj [konserve.filestore :refer [new-fs-store delete-store]])
             [konserve.memory :refer [new-mem-store]]
+            [konserve.core :as k]
             [hitchhiker.tree.bootstrap.konserve :as kons]
             [konserve.cache :as kc]
             [konserve.core :as k]

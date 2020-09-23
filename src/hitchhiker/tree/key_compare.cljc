@@ -175,12 +175,12 @@
        (-compare [^java.util.Date key1 key2]
                  (if (instance? java.util.Date key2)
                    (cond
-                     (< (.getTime key1) (.getTime key2)) -1
-                     (= (.getTime key1) (.getTime key2)) 0
+                     (< (.getTime key1) (.getTime ^java.util.Date key2)) -1
+                     (= (.getTime key1) (.getTime ^java.util.Date key2)) 0
                      :else 1)
                    (try
                      (compare key1 key2)
-                     (catch ClassCastException e
+                     (catch ClassCastException _
                        (- (n/-order-on-edn-types key2)
                           (n/-order-on-edn-types key1))))))
        nil

@@ -63,6 +63,8 @@
       (is (index-node? root))
       (is (not (index-node? data))))))
 
+
+
 (defn insert-helper
   [t k]
   (<?? (insert t k k)))
