@@ -1,5 +1,13 @@
 # Hitchhiker Tree
 
+<p align="center">
+<a href="https://clojurians.slack.com/archives/CB7GJAN0L"><img src="https://img.shields.io/badge/clojurians%20slack-join%20channel-blueviolet"/></a>
+<a href="https://clojars.org/io.replikativ/hitchhiker-tree"> <img src="https://img.shields.io/clojars/v/io.replikativ/hitchhiker-tree.svg" /></a>
+<a href="https://circleci.com/gh/replikativ/hitchhiker-tree"><img src="https://circleci.com/gh/replikativ/hitchhiker-tree.svg?style=shield"/></a>
+<a href="https://github.com/replikativ/hitchhiker-tree/tree/development"><img src="https://img.shields.io/github/last-commit/replikativ/hitchhiker-tree/development"/></a>
+<a href="https://versions.deps.co/replikativ/hitchhiker-tree" title="Dependencies Status"><img src="https://versions.deps.co/replikativ/hitchhiker-tree/status.svg" /></a>
+</p>
+
 Hitchhiker trees are a datastructure [invented by David Greenberg](https://github.com/datacrypt-project/hitchhiker-tree), synthesizing fractal trees and functional data structures, to create fast, snapshottable, massively scalable databases.
 
 We documented our extended design [here](https://blog.datopia.io/2018/11/03/hitchhiker-tree/). This repository currently reflects its development as a backend for [Datahike](https://github.com/replikativ/datahike). This respository adds ClojureScript support and provides a [core.async](https://github.com/clojure/core.async) backend for [konserve](https://github.com/replikativ/konserve) including a [Merkle](https://en.wikipedia.org/wiki/Merkle_tree) variant of the tree, effectively making the hitchhiker much more portable and apt for distributed infrastructure.
