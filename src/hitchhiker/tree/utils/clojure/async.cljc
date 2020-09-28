@@ -8,9 +8,9 @@
   ""
   {:style/indent 2}
   [then else]
-  (if *async?* 
-       then
-       else))
+  (if *async?*
+    then
+    else))
 
 (defn throw-if-exception
   "Helper method that checks if x is Exception and if yes, wraps it in a new
