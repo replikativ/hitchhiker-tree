@@ -48,11 +48,11 @@
       (is (= (map first (msg/lookup-fwd-iter root-node-second 0))
              (range 1 21)))
       ;; check that with empty caches we can still load the data
-        (let [reloaded-store     (kons/add-hitchhiker-tree-handlers
-                                  (kc/ensure-cache (async/<!! (new-fs-store folder))))
-              root-node-after-gc (ha/<?? (kons/create-tree-from-root-key reloaded-store root-key-second))]
-          (is (= (map first (msg/lookup-fwd-iter root-node-after-gc 0))
-                 (range 1 21)))))))
+      (let [reloaded-store     (kons/add-hitchhiker-tree-handlers
+                                (kc/ensure-cache (async/<!! (new-fs-store folder))))
+            root-node-after-gc (ha/<?? (kons/create-tree-from-root-key reloaded-store root-key-second))]
+        (is (= (map first (msg/lookup-fwd-iter root-node-after-gc 0))
+               (range 1 21)))))))
 
 
 
