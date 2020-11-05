@@ -27,8 +27,9 @@ workflows:
             - tools/setup
       - tools/deploy-snapshot:
           jarname: "hitchhiker-tree"
-          context: clojars-deploy
-          context: dockerhub-deploy
+          context: 
+            - clojars-deploy
+            - dockerhub-deploy
           filters:
             branches:
               only: development
@@ -40,8 +41,9 @@ workflows:
             - tools/build
       - tools/deploy-release:
           jarname: "hitchhiker-tree"
-          context: clojars-deploy
-          context: dockerhub-deploy
+          context: 
+            - clojars-deploy
+            - dockerhub-deploy
           filters:
             branches:
               only: master
