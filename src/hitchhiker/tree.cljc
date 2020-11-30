@@ -157,8 +157,6 @@
                (next set))
         (first set)))))
 
-(def empty-sorted-map-by-compare (sorted-map-by c/-compare))
-
 (defrecord DataNode [children storage-addr cfg *last-key-cache]
 
   n/IDataNode
@@ -192,8 +190,8 @@
     (let [data-b (:data-b cfg)]
       (loop [children children
              i 0
-             left empty-sorted-map-by-compare
-             right empty-sorted-map-by-compare]
+             left (sorted-map-by c/-compare)
+             right (sorted-map-by c/-compare)]
         (if-let [child (first children)]
           (if (< i data-b)
             (recur (next children)
@@ -335,7 +333,7 @@
   [{:keys [cfg] :as tree} k v]
   (ha/go-try
    (let [path (ha/<? (lookup-path tree k))
-         {:keys [children] :or {children empty-sorted-map-by-compare}} (peek path)
+         {:keys [children] :or {children (sorted-map-by c/-compare)}} (peek path)
          updated-data-node (data-node (assoc children k v)
                                       cfg)]
      (loop [node updated-data-node
@@ -375,7 +373,7 @@
   (ha/go-try
    (let [path (ha/<? (lookup-path tree key)) ;; don't care about the found key or its index
          {:keys [children]
-          :or {children empty-sorted-map-by-compare}} (peek path)
+          :or {children (sorted-map-by c/-compare)}} (peek path)
          updated-data-node (data-node (dissoc children key)
                                       cfg)]
      (loop [node updated-data-node
@@ -429,7 +427,7 @@
   [cfg & kvs]
   (ha/go-try
    (loop [[[k v] & r] (partition 2 kvs)
-          t (data-node empty-sorted-map-by-compare
+          t (data-node (sorted-map-by c/-compare)
                        cfg)]
      (if k
        (recur r (ha/<? (insert t k v)))
