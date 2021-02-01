@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>io.replikativ</groupId>
   <artifactId>hitchhiker-tree</artifactId>
-  <version>0.1.10</version>
+  <version>0.1.11</version>
   <name>konserve</name>
   <description>A Hitchhiker Tree Library</description>
   <dependencies>

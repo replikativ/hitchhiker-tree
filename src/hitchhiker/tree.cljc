@@ -157,7 +157,12 @@
                (next set))
         (first set)))))
 
-(def empty-sorted-map-by-compare (sorted-map-by c/-compare))
+;; To allow extensions of the comparison protocol after loading the
+;; hitchhiker-tree we deref the comparator at invocation time. An alternative of
+;; constructing the empty sets as non-singletons during runtime was explored in
+;; https://github.com/replikativ/hitchhiker-tree/pull/22, but performed worse in
+;; the benchmarks.
+(def empty-sorted-map-by-compare (sorted-map-by (fn [a b] (@#'c/-compare a b))))
 
 (defrecord DataNode [children storage-addr cfg *last-key-cache]
 
