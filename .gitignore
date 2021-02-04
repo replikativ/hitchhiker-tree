@@ -13,3 +13,5 @@ pom.xml.asc
 *.swo
 *.swn
 *~
+.cpcache/
+.shadow-cljs/
