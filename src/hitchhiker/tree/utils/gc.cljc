@@ -2,6 +2,7 @@
   (:require [hitchhiker.tree :as hh]
             [hitchhiker.tree.node :as n]
             [hitchhiker.tree.bootstrap.konserve :as kons]
+            [clojure.core.async]
             [#?(:clj hitchhiker.tree.utils.clojure.async
                 :cljs hitchhiker.tree.utils.cljs.async) :as ha]))
 

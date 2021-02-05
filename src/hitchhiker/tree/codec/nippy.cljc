@@ -1,7 +1,6 @@
 (ns hitchhiker.tree.codec.nippy
   (:require
-   #?(:clj [hitchhiker.tree :as tree]
-      :cljs [hitchhiker.tree-cljs :as tree])
+   [hitchhiker.tree :as tree]
    [hitchhiker.tree.node :as n]
    #?(:clj [taoensso.nippy :as nippy])))
 

@@ -72,6 +72,16 @@
        (recur (<? (go-f res f)) r)
        res))))
 
+(defn update-in< [m ks go-f & args]
+  (let [up (fn up [m ks go-f args]
+             (go-try
+              (let [[k & ks] ks]
+                (if ks
+                  (assoc m k (<? (up (get m k) ks go-f args)))
+                  (assoc m k (<? (apply go-f (get m k) args)))))))]
+    (up m ks go-f args)))
+
+
 #?(:clj
    (defn chan-seq [ch]
      (when-some [v (<?? ch)]
