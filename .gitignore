@@ -19,3 +19,5 @@ resources/public
 public
 .calva
 out
+/.clj-kondo
+.lsp
