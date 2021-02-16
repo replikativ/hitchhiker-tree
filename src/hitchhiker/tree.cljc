@@ -15,8 +15,10 @@
 
   * The 'stats' object must be convertible to a summary or whatever at the end"
   (:refer-clojure :exclude [subvec])
+  #?(:cljs (:require-macros [hitchhiker.tree :refer [<?-resolve]]))
   (:require
-   [hitchhiker.tree.utils.clojure.async :as ha]
+   #?(:cljs [hitchhiker.tree.utils.cljs.async :as ha]
+      :clj [hitchhiker.tree.utils.clojure.async :as ha])
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.backend :as b]
    [hitchhiker.tree.key-compare :as c]
@@ -43,17 +45,33 @@
         (map n/-last-key)
         (pop children)))
 
+
+(defn- cljs-env?
+  "Take the &env from a macro, and tell whether we are expanding into cljs."
+  [env]
+  (boolean (:ns env)))
+
+#?(:clj
+   (defmacro if-cljs
+     "Return then if we are generating cljs code and else for Clojure code.
+     https://groups.google.com/d/msg/clojurescript/iBY5HaQda4A/w1lAQi9_AwsJ"
+     [then else]
+     (if (cljs-env? &env) then else)))
+
 (defmacro <?-resolve
   [n]
   `(let [n# ~n]
      (if (resolved? n#)
        n#
-       (ha/<? (n/-resolve-chan n#)))))
+       (if-cljs
+        (hitchhiker.tree.utils.cljs.async/<? (n/-resolve-chan n#))
+        (hitchhiker.tree.utils.clojure.async/<? (n/-resolve-chan n#))))))
 
 (defn <-cache
   [cache calc-fn]
   (let [c @cache]
-    (if (identical?
+    (if (#?(:clj identical?
+            :cljs keyword-identical?)
          c ::nothing)
       (vreset! cache (calc-fn))
       c)))
@@ -128,7 +146,8 @@
           a (object-array l)
           _ (dotimes [i l]
               (aset a i (n/-last-key (nth children i))))
-          x (java.util.Arrays/binarySearch a 0 l k c/-compare)]
+          x #?(:clj (java.util.Arrays/binarySearch a 0 l k c/-compare)
+               :cljs (goog.array/binarySearch a k c/-compare))]
       (if (neg? x)
         (- (inc x))
         x))))
@@ -215,9 +234,12 @@
                cfg))
 
   (-lookup [root k]
-    (let [x (java.util.Collections/binarySearch (vec (keys children))
-                                                k
-                                                c/-compare)]
+    (let [x #?(:clj (java.util.Collections/binarySearch (vec (keys children))
+                                                        k
+                                                        c/-compare)
+               :cljs (goog.array/binarySearch (into-array (keys children))
+                                              k
+                                              c/-compare))]
       (if (neg? x)
         (- (inc x))
         x))))
@@ -525,16 +547,17 @@
             (recur (ha/<? (right-successor (pop path)))))
           (async/close! iter-ch)))))
 
-   (defn lookup-fwd-iter
-     "Compatibility helper to clojure sequences. Please prefer the channel
+   #?(:clj
+      (defn lookup-fwd-iter
+        "Compatibility helper to clojure sequences. Please prefer the channel
   interface of forward-iterator, as this function blocks your thread, which
   disturbs async contexts and might lead to poor performance. It is mainly here
   to facilitate testing."
-     [tree key]
-     (let [path (ha/<?? (lookup-path tree key))
-           iter-ch (async/chan)]
-       (forward-iterator iter-ch path key)
-       (ha/chan-seq iter-ch))))
+        [tree key]
+        (let [path (ha/<?? (lookup-path tree key))
+              iter-ch (async/chan)]
+          (forward-iterator iter-ch path key)
+          (ha/chan-seq iter-ch)))))
  ;; else
  (do
    (defn forward-iterator

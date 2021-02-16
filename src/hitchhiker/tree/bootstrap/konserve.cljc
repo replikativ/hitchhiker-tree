@@ -4,8 +4,7 @@
    [konserve.cache :as k]
    [hasch.core :as h]
    [hitchhiker.tree.messaging :as msg]
-   #?(:clj [hitchhiker.tree :as tree]
-      :cljs [hitchhiker.tree-cljs :as tree])
+   [hitchhiker.tree :as tree]
    [hitchhiker.tree.node :as n]
    [hitchhiker.tree.backend :as b]
    [hitchhiker.tree.key-compare :as c]
