@@ -120,57 +120,54 @@
   ;; TODO check whether store is using nippy in the future and load on the fly:
   #_[hitchhiker.tree.codec.nippy :as nippy]
   #_(nippy/ensure-installed!)
-  (let [tree-datanode 'hitchhiker.tree.DataNode
-        tree-indexnode 'hitchhiker.tree.IndexNode
-        tree-config 'hitchhiker.tree.Config]
-    (swap! (:read-handlers store)
-           merge
-           {'hitchhiker.tree.bootstrap.konserve.KonserveAddr
-            (fn [{:keys [last-key konserve-key]}]
-              (konserve-addr store
-                             last-key
-                             konserve-key))
-            tree-datanode      
-            (fn [{:keys [children cfg] :as d}]
-              (tree/data-node (into (sorted-map-by c/-compare)
-                                    children)
-                              cfg))
-            tree-indexnode
-            (fn [{:keys [children cfg op-buf]}]
-              (tree/index-node (vec children)
-                               (vec op-buf)
-                               cfg))
-            'hitchhiker.tree.messaging.InsertOp
-            msg/map->InsertOp
-            'hitchhiker.tree.messaging.DeleteOp
-            msg/map->DeleteOp
-            tree-config
-            tree/map->Config
+  (swap! (:read-handlers store)
+         merge
+         {'hitchhiker.tree.bootstrap.konserve.KonserveAddr
+          (fn [{:keys [last-key konserve-key]}]
+            (konserve-addr store
+                           last-key
+                           konserve-key))
+          'hitchhiker.tree.DataNode
+          (fn [{:keys [children cfg] :as d}]
+            (tree/data-node (into (sorted-map-by c/-compare)
+                                  children)
+                            cfg))
+          'hitchhiker.tree.IndexNode
+          (fn [{:keys [children cfg op-buf]}]
+            (tree/index-node (vec children)
+                             (vec op-buf)
+                             cfg))
+          'hitchhiker.tree.messaging.InsertOp
+          msg/map->InsertOp
+          'hitchhiker.tree.messaging.DeleteOp
+          msg/map->DeleteOp
+          'hitchhiker.tree.Config
+          tree/map->Config
 
           ;; support pre-refactoring 0.1.5 hitchhiker-tree record names
-            'hitchhiker.konserve.KonserveAddr
-            (fn [{:keys [last-key konserve-key]}]
-              (konserve-addr store
-                             last-key
-                             konserve-key))
-            'hitchhiker.tree.core.DataNode
-            (fn [{:keys [children cfg] :as d}]
-              (tree/data-node (into (sorted-map-by c/-compare)
-                                    children)
-                              cfg))
-            'hitchhiker.tree.core.IndexNode
-            (fn [{:keys [children cfg op-buf]}]
-              (tree/index-node (vec children)
-                               (vec op-buf)
-                               cfg))
-            'hitchhiker.tree.core.Config
-            tree/map->Config})
-    (swap! (:write-handlers store)
-           merge
-           {'hitchhiker.tree.bootstrap.konserve.KonserveAddr
-            encode-address
-            tree-datanode
-            encode-data-node
-            tree-indexnode
-            encode-index-node}))
+          'hitchhiker.konserve.KonserveAddr
+          (fn [{:keys [last-key konserve-key]}]
+            (konserve-addr store
+                           last-key
+                           konserve-key))
+          'hitchhiker.tree.core.DataNode
+          (fn [{:keys [children cfg] :as d}]
+            (tree/data-node (into (sorted-map-by c/-compare)
+                                  children)
+                            cfg))
+          'hitchhiker.tree.core.IndexNode
+          (fn [{:keys [children cfg op-buf]}]
+            (tree/index-node (vec children)
+                             (vec op-buf)
+                             cfg))
+          'hitchhiker.tree.core.Config
+          tree/map->Config})
+  (swap! (:write-handlers store)
+         merge
+         {'hitchhiker.tree.bootstrap.konserve.KonserveAddr
+          encode-address
+          'hitchhiker.tree.DataNode
+          encode-data-node
+          'hitchhiker.tree.IndexNode
+          encode-index-node})
   store)
