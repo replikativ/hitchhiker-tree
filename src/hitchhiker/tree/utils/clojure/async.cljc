@@ -81,7 +81,6 @@
                   (assoc m k (<? (apply go-f (get m k) args)))))))]
     (up m ks go-f args)))
 
-
 #?(:clj
    (defn chan-seq [ch]
      (when-some [v (<?? ch)]

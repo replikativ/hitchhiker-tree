@@ -45,7 +45,6 @@
         (map n/-last-key)
         (pop children)))
 
-
 (defn- cljs-env?
   "Take the &env from a macro, and tell whether we are expanding into cljs."
   [env]
