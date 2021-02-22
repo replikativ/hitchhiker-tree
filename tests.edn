@@ -1,2 +1,0 @@
-#kaocha/v1 {:tests [{:id :integration
-                     :ns-patterns ["hitchhiker.datahike-integration-test"]}]}

@@ -3,4 +3,4 @@
 set -o errexit
 set -o pipefail
 
-TIMBRE_LEVEL=':fatal' ./bin/kaocha --skip :integration $@
+TIMBRE_LEVEL=':fatal' ./bin/kaocha --skip-meta :integration $@
