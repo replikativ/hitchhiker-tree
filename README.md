@@ -5,7 +5,6 @@
 <a href="https://clojars.org/io.replikativ/hitchhiker-tree"> <img src="https://img.shields.io/clojars/v/io.replikativ/hitchhiker-tree.svg" /></a>
 <a href="https://circleci.com/gh/replikativ/hitchhiker-tree"><img src="https://circleci.com/gh/replikativ/hitchhiker-tree.svg?style=shield"/></a>
 <a href="https://github.com/replikativ/hitchhiker-tree/tree/development"><img src="https://img.shields.io/github/last-commit/replikativ/hitchhiker-tree/development"/></a>
-<a href="https://versions.deps.co/replikativ/hitchhiker-tree" title="Dependencies Status"><img src="https://versions.deps.co/replikativ/hitchhiker-tree/status.svg" /></a>
 </p>
 
 Hitchhiker trees are a datastructure [invented by David Greenberg](https://github.com/datacrypt-project/hitchhiker-tree), synthesizing fractal trees and functional data structures, to create fast, snapshottable, massively scalable databases.
