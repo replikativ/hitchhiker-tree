@@ -6,6 +6,7 @@
      (more memory but faster results for repeat queries)")
 
 (defprotocol IOperation
-  (-affects-key [op] "Which key this affects--currently must be a single key")
-  (-apply-op-to-coll [op coll] "Applies the operation to the collection")
+  (-insertion-ts [op] "Returns totally ordered timestamp at which this operation has been created.")
+  (-affects-key [op] "Which key this affects--currently must be a single key.")
+  (-apply-op-to-coll [op coll] "Applies the operation to the collection.")
   (-apply-op-to-tree [op tree] "Applies the operation to the tree. Returns go-block."))
