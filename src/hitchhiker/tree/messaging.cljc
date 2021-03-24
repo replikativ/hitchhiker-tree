@@ -173,7 +173,7 @@
 
 (defn current-timestamp []
   #?(:clj (System/currentTimeMillis)
-    :cljs (.getTime (js/Date.))))
+     :cljs (.getTime (js/Date.))))
 
 (defn insert
   [tree key value]
