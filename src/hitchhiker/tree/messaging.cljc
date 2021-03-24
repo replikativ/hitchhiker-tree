@@ -11,16 +11,18 @@
    [hitchhiker.tree :as tree]
    [clojure.core.async :as async]))
 
-(defrecord InsertOp [key value]
+(defrecord InsertOp [key value ts]
   op/IOperation
+  (-insertion-ts [_] ts)
   (-affects-key [_] key)
   (-apply-op-to-coll [_ map]
     (assoc map key value))
   (-apply-op-to-tree [_ tree]
     (tree/insert tree key value)))
 
-(defrecord DeleteOp [key]
+(defrecord DeleteOp [key ts]
   op/IOperation
+  (-insertion-ts [_] ts)
   (-affects-key [_] key)
   (-apply-op-to-coll [_ map]
     (dissoc map key))
@@ -158,7 +160,7 @@
       (reduce (fn [coll op]
                 (op/-apply-op-to-coll op coll))
               (:children data-node)
-              correct-ops))))
+              (sort-by #(op/-insertion-ts %) correct-ops)))))
 
 (defn lookup
   ([tree key]
@@ -169,14 +171,18 @@
           expanded (apply-ops-in-path path)]
       (get expanded key not-found)))))
 
+(defn current-timestamp []
+  #?(:clj (System/currentTimeMillis)
+    :cljs (.getTime (js/Date.))))
+
 (defn insert
   [tree key value]
-  (enqueue tree [(assoc (->InsertOp key value)
+  (enqueue tree [(assoc (->InsertOp key value (current-timestamp))
                         :tag (h/uuid))]))
 
 (defn delete
   [tree key]
-  (enqueue tree [(assoc (->DeleteOp key)
+  (enqueue tree [(assoc (->DeleteOp key (current-timestamp))
                         :tag (h/uuid))]))
 
 (ha/if-async?
