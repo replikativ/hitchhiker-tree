@@ -37,7 +37,6 @@
         (ha/<? (async/into [] iter-ch)))
       (msg/forward-iterator path key)))))
 
-
 (deftest simple-konserve-test
   (testing "Insert and lookup"
     #?(:cljs
@@ -101,6 +100,7 @@
 
 ;; ;; adapted from redis tests
 
+
 (defn insert
   [t k]
   (msg/insert t k k 0))
@@ -145,7 +145,6 @@
                  (is (ha/<? (ops-test ops 1000)))
                  (recur r)))
              (done)))))
-
 
 #?(:clj
    (defn mixed-op-seq

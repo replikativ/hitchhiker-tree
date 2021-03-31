@@ -50,8 +50,7 @@
                ;; inspired by datascript project.clj
                {:id "test"
                 :source-paths ["src" "test"]
-                :compiler {
-                           :main          hitchhiker.konserve-test
+                :compiler {:main          hitchhiker.konserve-test
                            :output-to     "target/test.js"
                            :output-dir    "target/none"
                            :optimizations :none

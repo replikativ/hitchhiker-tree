@@ -171,7 +171,6 @@
           expanded (apply-ops-in-path path)]
       (get expanded key not-found)))))
 
-
 (defn insert
   [tree key value op-count]
   (enqueue tree [(assoc (->InsertOp key value op-count)
@@ -181,7 +180,6 @@
   [tree key op-count]
   (enqueue tree [(assoc (->DeleteOp key op-count)
                         :tag (h/uuid))]))
-
 
 (ha/if-async?
  (do
@@ -212,17 +210,16 @@
           (ha/chan-seq iter-ch)))))
  ;; else
  (do
-  (defn forward-iterator
-      "Takes the result of a search and returns an iterator going
+   (defn forward-iterator
+     "Takes the result of a search and returns an iterator going
    forward over the tree. Does lg(n) backtracking sometimes."
-      [path]
-      (assert (tree/data-node? (peek path)))
-      (let [first-elements (apply-ops-in-path path)
-            next-elements (lazy-seq
-                           (when-let [succ (tree/right-successor (pop path))]
-                             (forward-iterator succ)))]
-        (concat first-elements next-elements)))
-
+     [path]
+     (assert (tree/data-node? (peek path)))
+     (let [first-elements (apply-ops-in-path path)
+           next-elements (lazy-seq
+                          (when-let [succ (tree/right-successor (pop path))]
+                            (forward-iterator succ)))]
+       (concat first-elements next-elements)))
 
    (defn lookup-fwd-iter
      [tree key]
