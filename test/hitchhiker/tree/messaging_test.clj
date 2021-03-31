@@ -70,7 +70,7 @@
                 (let [set-a (sort the-set)
                       set-b (take num the-set)
                       b-tree (reduce insert (ha/<?? (tree/b-tree (tree/->Config 3 3 2))) set-a)
-                      b-tree-without (reduce #(ha/<?? (msg/delete %1 %2)) b-tree set-b)
+                      b-tree-without (reduce #(ha/<?? (msg/delete %1 %2 0)) b-tree set-b)
                       b-tree-order (lookup-fwd-iter b-tree-without Integer/MIN_VALUE)]
                   (= (seq (remove (set set-b) set-a)) b-tree-order))))
 
@@ -106,12 +106,12 @@
                                  (case op
                                    :add [(insert t x-reduced)
                                          (conj s x-reduced)]
-                                   :del [(msg/delete t x-reduced)
+                                   :del [(msg/delete t x-reduced 0)
                                          (disj s x-reduced)])))
                              [(ha/<?? (tree/b-tree (tree/->Config 3 3 2))) #{}]
                              ops)
           f #(case (first %1) :add (insert %2 (second %1))
-               :del (msg/delete %2 (second %1)))
+               :del (msg/delete %2 (second %1) 0))
           ]
       ;  (println ops)
       (println killer-op)
@@ -130,7 +130,7 @@
 
   (clojure.pprint/pprint cool-test-tree)
   (clojure.pprint/pprint (insert cool-test-tree 20))
-  (clojure.pprint/pprint (msg/delete cool-test-tree 32))
+  (clojure.pprint/pprint (msg/delete cool-test-tree 32 0))
   )
 
 (defn mixed-op-seq
@@ -150,7 +150,7 @@
                                                (case op
                                                  :add [(insert t x-reduced)
                                                        (conj s x-reduced)]
-                                                 :del [(ha/<?? (msg/delete t x-reduced))
+                                                 :del [(ha/<?? (msg/delete t x-reduced 0))
                                                        (disj s x-reduced)])))
                                            [(ha/<?? (tree/b-tree (tree/->Config 3 3 2))) #{}]
                                            ops)]
@@ -167,7 +167,7 @@
                                  (case op
                                    :add [(insert t x-reduced)
                                          (conj s x-reduced)]
-                                   :del [(msg/delete t x-reduced)
+                                   :del [(msg/delete t x-reduced 0)
                                          (disj s x-reduced)])))
                              [(ha/<?? (tree/b-tree (tree/->Config 3 3 2))) #{}]
                              data)]
