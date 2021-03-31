@@ -12,7 +12,7 @@
 
 (defn insert
   [t k]
-  (ha/<?? (msg/insert t k k)))
+  (ha/<?? (msg/insert t k k 0)))
 
 (defn lookup-fwd-iter
   [t v]
