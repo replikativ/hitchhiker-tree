@@ -171,18 +171,15 @@
           expanded (apply-ops-in-path path)]
       (get expanded key not-found)))))
 
-(defn current-timestamp []
-  #?(:clj (System/currentTimeMillis)
-    :cljs (.getTime (js/Date.))))
 
 (defn insert
-  [tree key value]
-  (enqueue tree [(assoc (->InsertOp key value (current-timestamp))
+  [tree key value op-count]
+  (enqueue tree [(assoc (->InsertOp key value op-count)
                         :tag (h/uuid))]))
 
 (defn delete
-  [tree key]
-  (enqueue tree [(assoc (->DeleteOp key (current-timestamp))
+  [tree key op-count]
+  (enqueue tree [(assoc (->DeleteOp key op-count)
                         :tag (h/uuid))]))
 
 (ha/if-async?
