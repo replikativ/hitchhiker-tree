@@ -46,7 +46,7 @@
                                               (new-mem-store)
                                               #_(new-fs-store folder)))) ;; always use core.async here!
                      backend (kons/->KonserveBackend store)
-                     init-tree (ha/<? (ha/reduce< (fn [t i] (msg/insert t i i))
+                     init-tree (ha/<? (ha/reduce< (fn [t i] (msg/insert t i i 0))
                                                   (ha/<? (core/b-tree (core/->Config 1 3 (- 3 1))))
                                                   (range 1 11)))
                      flushed (ha/<? (core/flush-tree init-tree backend))
@@ -58,7 +58,7 @@
                    (is (= (ha/<? (msg/lookup tree (inc i))) (inc i))))
                  (is (= (map first (ha/<? (iter-helper tree 4))) (range 4 11)))
                  (is (= (map first (ha/<? (iter-helper tree 0))) (range 1 11)))
-                 (let [deleted (ha/<? (core/flush-tree (ha/<? (msg/delete tree 3)) backend))
+                 (let [deleted (ha/<? (core/flush-tree (ha/<? (msg/delete tree 3 0)) backend))
                        root-key (kons/get-root-key (:tree deleted))
                        tree (ha/<? (kons/create-tree-from-root-key store root-key))]
                    (is (= (ha/<? (msg/lookup tree 2)) 2))
@@ -74,7 +74,7 @@
              backend (kons/->KonserveBackend store)
              flushed (ha/<?? (core/flush-tree
                               (time (reduce (fn [t i]
-                                              (ha/<?? (msg/insert t i i)))
+                                              (ha/<?? (msg/insert t i i 0)))
                                             (ha/<?? (core/b-tree (core/->Config 1 3 (- 3 1))))
                                             (range 1 11)))
                               backend))
@@ -86,7 +86,7 @@
            (is (= (ha/<?? (msg/lookup tree (inc i))) (inc i))))
          (is (= (map first (msg/lookup-fwd-iter tree 4)) (range 4 11)))
          (is (= (map first (msg/lookup-fwd-iter tree 0)) (range 1 11)))
-         (let [deleted (ha/<?? (core/flush-tree (ha/<?? (msg/delete tree 3)) backend))
+         (let [deleted (ha/<?? (core/flush-tree (ha/<?? (msg/delete tree 3 0)) backend))
                root-key (kons/get-root-key (:tree deleted))
                tree (ha/<?? (kons/create-tree-from-root-key store root-key))]
            (is (= (ha/<?? (msg/lookup tree 2)) 2))
@@ -98,7 +98,7 @@
 
 (defn insert
   [t k]
-  (msg/insert t k k))
+  (msg/insert t k k 0))
 
 (defn ops-test [ops universe-size]
   (ha/go-try
@@ -121,7 +121,7 @@
                                                 t (:tree flushed)]
                                             [t (ha/<? (:storage-addr t)) set])
                                    :add [(ha/<? (insert t x-reduced)) root (conj set x-reduced)]
-                                   :del [(ha/<? (msg/delete t x-reduced)) root (disj set x-reduced)]))))
+                                   :del [(ha/<? (msg/delete t x-reduced 0)) root (disj set x-reduced)]))))
                             [(ha/<? (core/b-tree (core/->Config 3 3 2))) nil #{}]
                             ops))]
      (let [b-tree-order (seq (map first (ha/<? (iter-helper b-tree -1))))
