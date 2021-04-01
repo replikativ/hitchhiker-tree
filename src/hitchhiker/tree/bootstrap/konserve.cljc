@@ -113,10 +113,10 @@
               (ha/<? ch)
               (async/<!! ch))
          ;; need last key to bootstrap
-            last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
-        (ha/<? (n/-resolve-chan (konserve-addr store
-                                               last-key
-                                               root-key))))))
+         last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
+     (ha/<? (n/-resolve-chan (konserve-addr store
+                                            last-key
+                                            root-key))))))
 
 (defn add-hitchhiker-tree-handlers [store]
   ;; TODO check whether store is using nippy in the future and load on the fly:
@@ -140,9 +140,9 @@
                              (vec op-buf)
                              cfg))
           'hitchhiker.tree.messaging.InsertOp
-          msg/map->InsertOp
+          #(msg/->InsertOp (:key %) (:value %) (or (:ts %) 0))
           'hitchhiker.tree.messaging.DeleteOp
-          msg/map->DeleteOp
+          #(msg/->DeleteOp (:key %) (or (:ts %) 0))
           'hitchhiker.tree.Config
           tree/map->Config
 
@@ -163,9 +163,8 @@
                              (vec op-buf)
                              cfg))
           'hitchhiker.tree.core.Config
-          tree/map->Config
+          tree/map->Config})
 
-          })
   (swap! (:write-handlers store)
          merge
          {'hitchhiker.tree.bootstrap.konserve.KonserveAddr

@@ -13,6 +13,6 @@
   (-write-node [_ node session]
     (swap! session update-in [:writes] inc)
     (ha/go-try
-        (tn/testing-addr (n/-last-key node)
-                         (assoc node :*last-key-cache (tree/cache)))))
-  (-delete-addr [_ addr session ]))
+     (tn/testing-addr (n/-last-key node)
+                      (assoc node :*last-key-cache (tree/cache)))))
+  (-delete-addr [_ addr session]))

@@ -12,7 +12,7 @@
 
 (defn insert
   [t k]
-  (ha/<?? (msg/insert t k k)))
+  (ha/<?? (msg/insert t k k 0)))
 
 (defn lookup-fwd-iter
   [t v]
@@ -70,7 +70,7 @@
                 (let [set-a (sort the-set)
                       set-b (take num the-set)
                       b-tree (reduce insert (ha/<?? (tree/b-tree (tree/->Config 3 3 2))) set-a)
-                      b-tree-without (reduce #(ha/<?? (msg/delete %1 %2)) b-tree set-b)
+                      b-tree-without (reduce #(ha/<?? (msg/delete %1 %2 0)) b-tree set-b)
                       b-tree-order (lookup-fwd-iter b-tree-without Integer/MIN_VALUE)]
                   (= (seq (remove (set set-b) set-a)) b-tree-order))))
 
@@ -98,21 +98,19 @@
                        (take-last split-idx)
                        first)
         killer-op-dos (->> all-ops
-                       (take-last split-idx)
-                       second)
-        ]
+                           (take-last split-idx)
+                           second)]
     (let [[b-tree s] (reduce (fn [[t s] [op x]]
                                (let [x-reduced (mod x 100000)]
                                  (case op
                                    :add [(insert t x-reduced)
                                          (conj s x-reduced)]
-                                   :del [(msg/delete t x-reduced)
+                                   :del [(msg/delete t x-reduced 0)
                                          (disj s x-reduced)])))
                              [(ha/<?? (tree/b-tree (tree/->Config 3 3 2))) #{}]
                              ops)
           f #(case (first %1) :add (insert %2 (second %1))
-               :del (msg/delete %2 (second %1)))
-          ]
+                   :del (msg/delete %2 (second %1) 0))]
       ;  (println ops)
       (println killer-op)
       (clojure.pprint/pprint b-tree)
@@ -125,13 +123,11 @@
       (println (sort (disj s (second killer-op))))
       (when killer-op-dos
         (println killer-op-dos)
-        (clojure.pprint/pprint (f killer-op-dos (f killer-op b-tree)))))
-    )
+        (clojure.pprint/pprint (f killer-op-dos (f killer-op b-tree))))))
 
   (clojure.pprint/pprint cool-test-tree)
   (clojure.pprint/pprint (insert cool-test-tree 20))
-  (clojure.pprint/pprint (msg/delete cool-test-tree 32))
-  )
+  (clojure.pprint/pprint (msg/delete cool-test-tree 32 0)))
 
 (defn mixed-op-seq
   "Returns a property that ensures trees produced by a sequence of adds and deletes
@@ -140,17 +136,17 @@
   (let [add-freq (long (* 1000 add-vs-del-ratio))
         del-freq (long (* 1000 (- 1 add-vs-del-ratio)))]
     (prop/for-all [ops (gen/vector (gen/frequency
-                                     [[add-freq (gen/tuple (gen/return :add)
-                                                           (gen/no-shrink gen/int))]
-                                      [del-freq (gen/tuple (gen/return :del)
-                                                           (gen/no-shrink gen/int))]])
+                                    [[add-freq (gen/tuple (gen/return :add)
+                                                          (gen/no-shrink gen/int))]
+                                     [del-freq (gen/tuple (gen/return :del)
+                                                          (gen/no-shrink gen/int))]])
                                    num-ops)]
                   (let [[b-tree s] (reduce (fn [[t s] [op x]]
                                              (let [x-reduced (mod x universe-size)]
                                                (case op
                                                  :add [(insert t x-reduced)
                                                        (conj s x-reduced)]
-                                                 :del [(ha/<?? (msg/delete t x-reduced))
+                                                 :del [(ha/<?? (msg/delete t x-reduced 0))
                                                        (disj s x-reduced)])))
                                            [(ha/<?? (tree/b-tree (tree/->Config 3 3 2))) #{}]
                                            ops)]
@@ -160,23 +156,19 @@
 
 (comment
   (let [data (read-string (slurp "broken-data2.edn"))
-        universe-size 1000
-        ]
+        universe-size 1000]
     (let [[b-tree s] (reduce (fn [[t s] [op x]]
                                (let [x-reduced (mod x universe-size)]
                                  (case op
                                    :add [(insert t x-reduced)
                                          (conj s x-reduced)]
-                                   :del [(msg/delete t x-reduced)
+                                   :del [(msg/delete t x-reduced 0)
                                          (disj s x-reduced)])))
                              [(ha/<?? (tree/b-tree (tree/->Config 3 3 2))) #{}]
                              data)]
       ;                  (println ops)
       (println (lookup-fwd-iter b-tree -1))
-      (println (sort s))
-           )
-    )
-  )
+      (println (sort s)))))
 
 (defspec test-few-keys-many-ops
   50

@@ -6,6 +6,8 @@
 
 
 ;; TODO share with konserve
+
+
 (declare encode)
 
 (defn nilify
@@ -39,7 +41,6 @@
     (tree/data-node? node) (encode-data-node node)
     (n/address? node) (encode-address node)
     :else node))
-
 
 (defonce install*
   (delay
