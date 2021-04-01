@@ -20,10 +20,6 @@ workflows:
           context: dockerhub-deploy
           requires:
             - tools/setup
-      - tools/cljstest:
-          context: dockerhub-deploy
-          requires:
-            - tools/setup
       - tools/build:
           jarname: "hitchhiker-tree"
           context: dockerhub-deploy
@@ -42,7 +38,6 @@ workflows:
             - tools/format
             - tools/unittest
             - tools/integrationtest
-            - tools/cljstest
             - tools/build
       - tools/deploy-release:
           jarname: "hitchhiker-tree"
@@ -57,5 +52,4 @@ workflows:
             - tools/format
             - tools/unittest
             - tools/integrationtest
-            - tools/cljstest
             - tools/build
