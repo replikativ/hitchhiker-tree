@@ -23,7 +23,7 @@
           backend          (kons/->KonserveBackend store)
           flushed          (ha/<?? (tree/flush-tree
                                     (reduce (fn [t i]
-                                              (ha/<?? (msg/insert t i i)))
+                                              (ha/<?? (msg/insert t i i 0)))
                                             (ha/<?? (tree/b-tree (tree/->Config 2 3 (- 3 2))))
                                             (range 1 11))
                                     backend))
@@ -31,7 +31,7 @@
           root-node        (ha/<?? (kons/create-tree-from-root-key store root-key))
           flushed-second   (ha/<?? (tree/flush-tree
                                     (reduce (fn [t i]
-                                              (ha/<?? (msg/insert t i i)))
+                                              (ha/<?? (msg/insert t i i 0)))
                                             (:tree flushed)
                                             (range 11 21))
                                     backend))
