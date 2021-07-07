@@ -470,7 +470,7 @@
                                     catvec))
             cleaned-node (assoc tree :children cleaned-children)
             new-addr (ha/<? (b/-write-node backend cleaned-node stats))]
-        (async/>!! (:storage-addr tree)
+        (#?(:clj async/>!! :cljs async/>!) (:storage-addr tree)
                    new-addr)
         new-addr)
       tree))))
@@ -508,7 +508,7 @@
         (if root-node?
           cleaned-node
           (let [new-addr (ha/<? (b/-write-node backend cleaned-node stats))]
-            (async/>!! (:storage-addr tree)
+            (#?(:clj async/>!! :cljs async/>!) (:storage-addr tree)
                        new-addr)
             new-addr)))
       tree))))
