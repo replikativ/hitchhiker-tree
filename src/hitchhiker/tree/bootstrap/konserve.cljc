@@ -68,10 +68,8 @@
          (do
            (swap! cache cache/hit konserve-key)
            (assoc v :storage-addr (synthesize-storage-address konserve-key)))
-         (let [ch (k/get-in store [konserve-key])]
-           (assoc (ha/if-async?
-                   (ha/<? ch)
-                   (async/<!! ch))
+         (let [ch (k/get-in store [konserve-key] nil {:sync? (not ha/*async?*)})]
+           (assoc (ha/<? ch)
                   :storage-addr (synthesize-storage-address konserve-key))))))))
 
 (defn konserve-addr
@@ -91,7 +89,7 @@
      (swap! session update-in [:writes] inc)
      (let [pnode (encode node)
            id (h/uuid pnode)]
-       (ha/<? (k/assoc-in store [id] node))
+       (ha/<? (k/assoc-in store [id] node {:sync? (not ha/*async?*)}))
        (konserve-addr store
                       (n/-last-key node)
                       id))))
@@ -107,10 +105,8 @@
 (defn create-tree-from-root-key
   [store root-key]
   (ha/go-try
-   (let [ch (k/get-in store [root-key])
-         val (ha/if-async?
-              (ha/<? ch)
-              (async/<!! ch))
+   (let [ch (k/get-in store [root-key] nil {:sync? (not ha/*async?*)})
+         val (ha/<? ch)
          last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
      (ha/<? (n/-resolve-chan (konserve-addr store
                                             last-key
