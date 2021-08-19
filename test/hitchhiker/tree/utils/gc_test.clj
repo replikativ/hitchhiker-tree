@@ -20,7 +20,7 @@
           _                (delete-store folder)
           store            (kons/add-hitchhiker-tree-handlers
                             (kc/ensure-cache (async/<!! (new-fs-store folder))))
-          backend          (kons/->KonserveBackend store)
+          backend          (kons/konserve-backend store)
           flushed          (ha/<?? (tree/flush-tree
                                     (reduce (fn [t i]
                                               (ha/<?? (msg/insert t i i 0)))

@@ -99,7 +99,7 @@
                            (ha/<?? (msg/insert t i i)))
                          (ha/<?? (tree/b-tree (tree/->Config 3 3 2)))
                          (shuffle (range 1 30))))
-           (kons/->KonserveBackend store))))
+           (kons/konserve-backend store))))
 
 (def flushed
   (ha/<?? (tree/flush-tree
@@ -107,7 +107,7 @@
                            (ha/<?? (msg/insert t i i)))
                          (:tree flushed)
                          (shuffle (range -4 -2))))
-           (kons/->KonserveBackend store))))
+           (kons/konserve-backend store))))
 
 (comment
   ;; TODO double root node?
@@ -125,14 +125,14 @@
                                         (ha/<?? (tree/b-tree (tree/->Config 2 2 2)))
                                         (concat (range 1 12)
                                                 #_[0 13 14 -1 15])))
-                          (kons/->KonserveBackend store))))
+                          (kons/konserve-backend store))))
 
     (def flushed (ha/<?? (tree/flush-tree
                           (time (reduce (fn [t i]
                                           (ha/<?? (msg/insert t i i)))
                                         (:tree flushed)
                                         (range 12 14)))
-                          (kons/->KonserveBackend store))))
+                          (kons/konserve-backend store))))
 
     (view (create-graph store))))
 

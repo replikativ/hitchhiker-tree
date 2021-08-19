@@ -2,9 +2,9 @@
   (:require [#?(:clj clojure.test :cljs cljs.test)
              #?(:clj :refer :cljs :refer-macros) [deftest testing run-tests is
                                                   #?(:cljs async)]]
-            [clojure.test.check.clojure-test #?(:clj :refer :cljs :refer-macros) [defspec]]
-            [clojure.test.check.generators :as gen :include-macros true]
-            [clojure.test.check.properties :as prop :include-macros true]
+            #_[clojure.test.check.clojure-test #?(:clj :refer :cljs :refer-macros) [defspec]]
+            #_[clojure.test.check.generators :as gen :include-macros true]
+            #_[clojure.test.check.properties :as prop :include-macros true]
             #?(:clj [konserve.filestore :refer [new-fs-store delete-store]])
             [konserve.memory :refer [new-mem-store]]
             [konserve.core :as k]
@@ -16,7 +16,7 @@
             [#?(:clj hitchhiker.tree.utils.clojure.async
                 :cljs hitchhiker.tree.utils.cljs.async) :as ha]
             [hitchhiker.tree.messaging :as msg]
-            [hitchhiker.ops :refer [recorded-ops]]
+            #_[hitchhiker.ops :refer [recorded-ops]]
             [clojure.core.async :as async]
 
             [clojure.string :as str]
@@ -45,7 +45,7 @@
                             (kc/ensure-cache (async/<!
                                               (new-mem-store)
                                               #_(new-fs-store folder)))) ;; always use core.async here!
-                     backend (kons/->KonserveBackend store)
+                     backend (kons/konserve-backend store)
                      init-tree (ha/<? (ha/reduce< (fn [t i] (msg/insert t i i 0))
                                                   (ha/<? (core/b-tree (core/->Config 1 3 (- 3 1))))
                                                   (range 1 11)))
@@ -71,7 +71,7 @@
              _ (delete-store folder)
              store (kons/add-hitchhiker-tree-handlers
                     (kc/ensure-cache (async/<!! (new-fs-store folder :config {:fsync false}))))
-             backend (kons/->KonserveBackend store)
+             backend (kons/konserve-backend store)
              flushed (ha/<?? (core/flush-tree
                               (time (reduce (fn [t i]
                                               (ha/<?? (msg/insert t i i 0)))
@@ -117,7 +117,7 @@
                               (ha/go-try
                                (let [x-reduced (when x (mod x universe-size))]
                                  (case op
-                                   :flush (let [flushed (ha/<? (core/flush-tree t (kons/->KonserveBackend store)))
+                                   :flush (let [flushed (ha/<? (core/flush-tree t (kons/konserve-backend store)))
                                                 t (:tree flushed)]
                                             [t (ha/<? (:storage-addr t)) set])
                                    :add [(ha/<? (insert t x-reduced)) root (conj set x-reduced)]

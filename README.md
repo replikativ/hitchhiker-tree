@@ -44,7 +44,7 @@ We use [tree.cljc](src/hitchhiker/tree.cljc) and [messaging.cljc](src/hitchhiker
       _ (delete-store folder)
       store (kons/add-hitchhiker-tree-handlers
              (kc/ensure-cache (async/<!! (new-fs-store folder :config {:fsync false}))))
-      backend (kons/->KonserveBackend store)
+      backend (kons/konserve-backend store)
       config (core/->Config 1 3 (- 3 1))
       flushed (ha/<?? (core/flush-tree
                        (time (reduce (fn [t i]

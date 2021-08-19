@@ -79,7 +79,7 @@
                   konserve-key
                   (ha/promise-chan konserve-key)))
 
-(defrecord KonserveBackend [store]
+(defrecord KonserveBackend [store hash-nodes?]
   b/IBackend
   (-new-session [_] (atom {:writes 0 :deletes 0}))
   (-anchor-root [_ {:keys [konserve-key] :as node}]
@@ -88,13 +88,19 @@
     (ha/go-try
      (swap! session update-in [:writes] inc)
      (let [pnode (encode node)
-           id (h/uuid pnode)]
+           id (if hash-nodes? (h/uuid pnode) (h/uuid))]
        (ha/<? (k/assoc-in store [id] node {:sync? (not ha/*async?*)}))
        (konserve-addr store
                       (n/-last-key node)
                       id))))
   (-delete-addr [_ addr session]
     (swap! session update :deletes inc)))
+
+(defn konserve-backend
+  ([store]
+   (konserve-backend store true))
+  ([store hash-nodes?]
+   (KonserveBackend. store hash-nodes?)))
 
 (defn get-root-key
   [tree]
