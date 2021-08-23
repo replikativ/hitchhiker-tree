@@ -115,9 +115,7 @@
     (def store (kons/add-hitchhiker-tree-handlers
                 (kc/ensure-cache (ha/<?? (new-mem-store)))))
 
-
-    ;; insertion
-
+;; insertion
 
     (def flushed (ha/<?? (tree/flush-tree
                           (time (reduce (fn [t i]

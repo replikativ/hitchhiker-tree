@@ -110,7 +110,7 @@
                              [(ha/<?? (tree/b-tree (tree/->Config 3 3 2))) #{}]
                              ops)
           f #(case (first %1) :add (insert %2 (second %1))
-               :del (msg/delete %2 (second %1) 0))]
+                   :del (msg/delete %2 (second %1) 0))]
       ;  (println ops)
       (println killer-op)
       (clojure.pprint/pprint b-tree)

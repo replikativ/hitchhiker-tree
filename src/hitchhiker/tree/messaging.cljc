@@ -171,7 +171,6 @@
           expanded (apply-ops-in-path path)]
       (get expanded key not-found)))))
 
-
 (defn insert
   ([tree key value]
    (insert tree key value 0))

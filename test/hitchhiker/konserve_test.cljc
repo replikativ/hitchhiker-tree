@@ -95,7 +95,6 @@
          (delete-store folder)))))
 ;; ;; adapted from redis tests
 
-
 (defn insert
   [t k]
   (msg/insert t k k 0))

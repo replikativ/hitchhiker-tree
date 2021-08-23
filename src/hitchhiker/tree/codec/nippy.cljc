@@ -4,9 +4,7 @@
    [hitchhiker.tree.node :as n]
    #?(:clj [taoensso.nippy :as nippy])))
 
-
 ;; TODO share with konserve
-
 
 (declare encode)
 
