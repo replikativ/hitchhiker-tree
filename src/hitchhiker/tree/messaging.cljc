@@ -173,14 +173,18 @@
 
 
 (defn insert
-  [tree key value op-count]
-  (enqueue tree [(assoc (->InsertOp key value op-count)
-                        :tag (h/uuid))]))
+  ([tree key value]
+   (insert tree key value 0))
+  ([tree key value op-count]
+   (enqueue tree [(assoc (->InsertOp key value op-count)
+                         :tag (h/uuid))])))
 
 (defn delete
-  [tree key op-count]
-  (enqueue tree [(assoc (->DeleteOp key op-count)
-                        :tag (h/uuid))]))
+  ([tree key]
+   (delete tree key 0))
+  ([tree key op-count]
+   (enqueue tree [(assoc (->DeleteOp key op-count)
+                         :tag (h/uuid))])))
 
 (ha/if-async?
  (do
