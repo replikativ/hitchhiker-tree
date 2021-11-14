@@ -141,12 +141,12 @@
                              cfg))
           'hitchhiker.tree.messaging.InsertOp
           #(msg/->InsertOp (:key %) (:value %)
-                         (or (:ts %) 0)
-                         (or (:version %) 0))
+                           (or (:ts %) 0)
+                           (or (:version %) 0))
           'hitchhiker.tree.messaging.DeleteOp
           #(msg/->DeleteOp (:key %)
-                         (or (:ts %) 0)
-                         (or (:version %) 0))
+                           (or (:ts %) 0)
+                           (or (:version %) 0))
           'hitchhiker.tree.Config
           tree/map->Config
 
