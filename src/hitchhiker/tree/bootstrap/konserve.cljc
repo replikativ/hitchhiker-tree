@@ -140,9 +140,13 @@
                              (vec op-buf)
                              cfg))
           'hitchhiker.tree.messaging.InsertOp
-          #(msg/->InsertOp (:key %) (:value %) (or (:ts %) 0))
+          #(msg/->InsertOp (:key %) (:value %)
+                         (or (:ts %) 0)
+                         (or (:version %) 0))
           'hitchhiker.tree.messaging.DeleteOp
-          #(msg/->DeleteOp (:key %) (or (:ts %) 0))
+          #(msg/->DeleteOp (:key %)
+                         (or (:ts %) 0)
+                         (or (:version %) 0))
           'hitchhiker.tree.Config
           tree/map->Config
 
