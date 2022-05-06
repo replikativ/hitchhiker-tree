@@ -27,7 +27,7 @@ We use [tree.cljc](src/hitchhiker/tree.cljc) and [messaging.cljc](src/hitchhiker
             [hitchhiker.tree.bootstrap.konserve :as kons]
             [hitchhiker.tree.utils.async :as ha]
             [konserve.cache :as kc]
-            [konserve.filestore :refer [new-fs-store delete-store list-keys]]
+            [konserve.filestore :refer [connect-fs-store delete-store list-files]]
             [clojure.core.async :as async]
             [clojure.test :refer [deftest testing run-tests is]
              ]))
@@ -36,7 +36,7 @@ We use [tree.cljc](src/hitchhiker/tree.cljc) and [messaging.cljc](src/hitchhiker
 (let [folder "/tmp/async-hitchhiker-tree-test"
       _ (delete-store folder)
       store (kons/add-hitchhiker-tree-handlers
-             (kc/ensure-cache (async/<!! (new-fs-store folder :config {:fsync false}))))
+             (kc/ensure-cache (async/<!! (connect-fs-store folder :config {:fsync false}))))
       backend (kons/->KonserveBackend store)
       config (core/->Config 1 3 (- 3 1))
       flushed (ha/<?? (core/flush-tree
@@ -61,7 +61,6 @@ We use [tree.cljc](src/hitchhiker/tree.cljc) and [messaging.cljc](src/hitchhiker
     (is (= (ha/<?? (msg/lookup tree 4)) 4)))
   (delete-store folder))
 ```
-
 
 ## Benchmarking
 
@@ -96,12 +95,9 @@ And it will generate lots of data and the Excel workbook for analysis.
 
 If you'd like to see the options for the benchmarking tool, just run `lein bench`.
 
-
-
 ## Original Outboard Redis API
 
 _Note that this API is not actively developed, but can still be useful if you are interested in Redis._
-
 
 Outboard is a simple API for your Clojure applications that enables you to make use of tens of gigabytes of local memory, far beyond what the JVM can manage.
 Outboard also allows you to restart your application and reuse all of that in-memory data, which dramatic reduces startup times due to data loading.
@@ -197,6 +193,6 @@ Also, thanks to Tom Faulhaber for making the Excel analysis awesome!
 
 ## License
 
-Copyright © 2016 David Greenberg, 2017-2020 Christian Weilbach 
+Copyright © 2016 David Greenberg, 2017-2020 Christian Weilbach
 
 Distributed under the Eclipse Public License version 1.0

@@ -11,7 +11,7 @@
    #?@(:clj [[clojure.core.async :as async]]
        :cljs [[cljs.core.async :as async]])))
 
-(defrecord InsertOp [key value ts]
+(defrecord InsertOp [key value ts version]
   op/IOperation
   (-insertion-ts [_] ts)
   (-affects-key [_] key)
@@ -20,7 +20,7 @@
   (-apply-op-to-tree [_ tree]
     (tree/insert tree key value)))
 
-(defrecord DeleteOp [key ts]
+(defrecord DeleteOp [key ts version]
   op/IOperation
   (-insertion-ts [_] ts)
   (-affects-key [_] key)
@@ -172,14 +172,16 @@
       (get expanded key not-found)))))
 
 (defn insert
-  [tree key value op-count]
-  (enqueue tree [(assoc (->InsertOp key value op-count)
-                        :tag (h/uuid))]))
+  ([tree key value]
+   (insert tree key value 0))
+  ([tree key value op-count]
+   (enqueue tree [(->InsertOp key value op-count tree/version)])))
 
 (defn delete
-  [tree key op-count]
-  (enqueue tree [(assoc (->DeleteOp key op-count)
-                        :tag (h/uuid))]))
+  ([tree key]
+   (delete tree key 0))
+  ([tree key op-count]
+   (enqueue tree [(->DeleteOp key op-count tree/version)])))
 
 (ha/if-async?
  (do

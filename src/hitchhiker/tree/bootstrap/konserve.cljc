@@ -68,10 +68,8 @@
          (do
            (swap! cache cache/hit konserve-key)
            (assoc v :storage-addr (synthesize-storage-address konserve-key)))
-         (let [ch (k/get-in store [konserve-key])]
-           (assoc (ha/if-async?
-                   (ha/<? ch)
-                   (async/<!! ch))
+         (let [ch (k/get-in store [konserve-key] nil {:sync? (not ha/*async?*)})]
+           (assoc (ha/<? ch)
                   :storage-addr (synthesize-storage-address konserve-key))))))))
 
 (defn konserve-addr
@@ -81,7 +79,7 @@
                   konserve-key
                   (ha/promise-chan konserve-key)))
 
-(defrecord KonserveBackend [store]
+(defrecord KonserveBackend [store hash-nodes?]
   b/IBackend
   (-new-session [_] (atom {:writes 0 :deletes 0}))
   (-anchor-root [_ {:keys [konserve-key] :as node}]
@@ -90,14 +88,20 @@
     (ha/go-try
      (swap! session update-in [:writes] inc)
      (let [pnode (encode node)
-           id (h/uuid pnode)
-           ch (k/assoc-in store [id] node)]
+           id (if hash-nodes? (h/uuid pnode) (h/uuid))
+           ch (k/assoc-in store [id] node {:sync? (not ha/*async?*)})]
        (ha/<? ch)
        (konserve-addr store
                       (n/-last-key node)
                       id))))
   (-delete-addr [_ addr session]
     (swap! session update :deletes inc)))
+
+(defn konserve-backend
+  ([store]
+   (konserve-backend store true))
+  ([store hash-nodes?]
+   (KonserveBackend. store hash-nodes?)))
 
 (defn get-root-key
   [tree]
@@ -108,10 +112,8 @@
 (defn create-tree-from-root-key
   [store root-key]
   (ha/go-try
-   (let [ch (k/get-in store [root-key])
-         val (ha/if-async?
-              (ha/<? ch)
-              (async/<!! ch))
+   (let [ch (k/get-in store [root-key] nil {:sync? (not ha/*async?*)})
+         val (ha/<? ch)
          ;; need last key to bootstrap
          last-key (n/-last-key (assoc val :storage-addr (synthesize-storage-address root-key)))]
      (ha/<? (n/-resolve-chan (konserve-addr store
@@ -140,9 +142,13 @@
                              (vec op-buf)
                              cfg))
           'hitchhiker.tree.messaging.InsertOp
-          #(msg/->InsertOp (:key %) (:value %) (or (:ts %) 0))
+          #(msg/->InsertOp (:key %) (:value %)
+                           (or (:ts %) 0)
+                           (or (:version %) 0))
           'hitchhiker.tree.messaging.DeleteOp
-          #(msg/->DeleteOp (:key %) (or (:ts %) 0))
+          #(msg/->DeleteOp (:key %)
+                           (or (:ts %) 0)
+                           (:or (:version %) 0))
           'hitchhiker.tree.Config
           tree/map->Config
 
