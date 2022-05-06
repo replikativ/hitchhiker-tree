@@ -14,3 +14,5 @@ pom.xml.asc
 *~
 .cpcache/
 .shadow-cljs/
+.vscode
+.clj-kondo
