@@ -134,13 +134,13 @@
   (defn totally-fetch
     [redis-key]
     (let [run (delay
-               (loop [i 0]
-                 (if (= i 1000)
-                   (do (println "total fail") (throw (ex-info "total fail" {:key redis-key})))
-                   (let [x (wcar {} (car/get redis-key))]
-                     (if x
-                       x
-                       (do (Thread/sleep 25) (recur (inc i))))))))
+                (loop [i 0]
+                  (if (= i 1000)
+                    (do (println "total fail") (throw (ex-info "total fail" {:key redis-key})))
+                    (let [x (wcar {} (car/get redis-key))]
+                      (if x
+                        x
+                        (do (Thread/sleep 25) (recur (inc i))))))))
           cs (swap! cache (fn [c]
                             (if (cache/has? c redis-key)
                               (cache/hit c redis-key)

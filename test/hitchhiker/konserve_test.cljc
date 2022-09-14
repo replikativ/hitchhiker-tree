@@ -110,7 +110,7 @@
                 (kc/ensure-cache
                  #?(:clj (async/<!! (connect-fs-store folder :config {:fsync false}))
                     :cljs (async/<! (new-mem-store)))))
-         _ #?(:clj (assert (empty? (async/<!! (list-files store)))
+         _ #?(:clj (assert (empty? (async/<!! (list-files folder)))
                            "Start with no keys")
               :cljs nil)
                                         ;_ (swap! recorded-ops conj ops)
@@ -149,17 +149,17 @@
      [add-freq del-freq flush-freq universe-size num-ops]
      (prop/for-all [ops (gen/vector (gen/frequency
                                      [[add-freq (gen/tuple (gen/return :add)
-                                                           (gen/no-shrink gen/int))]
+                                                           (gen/no-shrink gen/small-integer))]
                                       [flush-freq (gen/return [:flush])]
                                       [del-freq (gen/tuple (gen/return :del)
-                                                           (gen/no-shrink gen/int))]])
+                                                           (gen/no-shrink gen/small-integer))]])
                                     num-ops)]
                    (ha/<?? (ops-test ops universe-size)))))
 
-;; #?(:clj
-;;    (defspec test-many-keys-bigger-trees
-;;      100
-;;      (mixed-op-seq 800 200 10 1000 1000)))
+#?(:clj
+   (defspec test-many-keys-bigger-trees
+     100
+     (mixed-op-seq 800 200 10 1000 1000)))
 
 #?(:cljs
    (defn ^:export test-all [cb]
