@@ -1,0 +1,17 @@
+#!/bin/bash
+
+echo "Running Clojure tests..."
+./bin/run-unittests "$@"
+echo
+
+echo "Running Clojure integration tests..."
+./bin/run-integrationtests "$@"
+echo
+
+echo "Running ClojureScript tests..."
+./bin/run-cljstests
+echo
+
+echo "Checking format..."
+clj -M:format
+echo
