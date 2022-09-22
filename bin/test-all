@@ -1,11 +1,13 @@
 #!/bin/bash
 
 echo "Running Clojure tests..."
-./bin/run-unittests "$@"
+# shellcheck disable=SC2068
+./bin/run-unittests $@
 echo
 
 echo "Running Clojure integration tests..."
-./bin/run-integrationtests "$@"
+# shellcheck disable=SC2068
+./bin/run-integrationtests $@
 echo
 
 echo "Running ClojureScript tests..."

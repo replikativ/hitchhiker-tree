@@ -34,7 +34,9 @@
         (when path
           (msg/forward-iterator iter-ch path key))
         (ha/<? (async/into [] iter-ch)))
-      (msg/forward-iterator path key)))))
+      (if path
+          (msg/forward-iterator path)
+          [])))))
 
 (deftest simple-konserve-test
   (testing "Insert and lookup"
@@ -110,7 +112,7 @@
                 (kc/ensure-cache
                  #?(:clj (async/<!! (connect-fs-store folder :config {:fsync false}))
                     :cljs (async/<! (new-mem-store)))))
-         _ #?(:clj (assert (empty? (async/<!! (list-files folder)))
+         _ #?(:clj (assert (empty? (list-files folder))
                            "Start with no keys")
               :cljs nil)
                                         ;_ (swap! recorded-ops conj ops)

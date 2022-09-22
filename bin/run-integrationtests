@@ -3,4 +3,5 @@
 set -o errexit
 set -o pipefail
 
-TIMBRE_LEVEL=':fatal' ./bin/kaocha --focus-meta :integration $@
+# shellcheck disable=SC2068
+TIMBRE_LEVEL=':fatal' clojure -M:test -m kaocha.runner --focus-meta :integration $@
