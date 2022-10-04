@@ -16,5 +16,6 @@ pom.xml.asc
 .shadow-cljs/
 .vscode
 .clj-kondo
+.calva/
 .idea/
 *.iml
