@@ -24,6 +24,8 @@
    #?(:clj [clojure.core.async :as async]
       :cljs [cljs.core.async :as async :include-macros true])))
 
+(def ^:const version 0)
+
 (defrecord Config [index-b data-b op-buf-size])
 
 (defrecord Split [left right median])
@@ -68,7 +70,8 @@
                       storage-addr
                       op-buf
                       cfg
-                      *last-key-cache]
+                      *last-key-cache
+                      version]
   n/IIndexNode
   n/IResolved
 
@@ -142,7 +145,8 @@
                (async/promise-chan)
                op-buf
                cfg
-               (cache)))
+               (cache)
+               version))
 
 (defn nth-of-set
   "Like nth, but for sorted sets. O(n) in worst case, 0(1) when idx out
@@ -164,7 +168,7 @@
 ;; the benchmarks.
 (def empty-sorted-map-by-compare (sorted-map-by (fn [a b] (@#'c/-compare a b))))
 
-(defrecord DataNode [children storage-addr cfg *last-key-cache]
+(defrecord DataNode [children storage-addr cfg *last-key-cache version]
 
   n/IDataNode
   n/IResolved
@@ -234,7 +238,8 @@
   (->DataNode children
               (async/promise-chan)
               cfg
-              (cache)))
+              (cache)
+              version))
 
 (defn data-node?
   [node]

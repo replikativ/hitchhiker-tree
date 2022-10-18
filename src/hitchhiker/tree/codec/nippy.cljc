@@ -4,9 +4,7 @@
    [hitchhiker.tree.node :as n]
    #?(:clj [taoensso.nippy :as nippy])))
 
-
 ;; TODO share with konserve
-
 
 (declare encode)
 
@@ -44,21 +42,21 @@
 
 (defonce install*
   (delay
-   #?@(:clj [(nippy/extend-freeze hitchhiker.tree.IndexNode :b-tree/index-node
-                                  [node data-output]
-                                  (nippy/freeze-to-out! data-output (into {} (encode node))))
+    #?@(:clj [(nippy/extend-freeze hitchhiker.tree.IndexNode :b-tree/index-node
+                                   [node data-output]
+                                   (nippy/freeze-to-out! data-output (into {} (encode node))))
 
-             (nippy/extend-thaw :b-tree/index-node
-                                [data-input]
-                                (tree/map->IndexNode (nippy/thaw-from-in! data-input)))
+              (nippy/extend-thaw :b-tree/index-node
+                                 [data-input]
+                                 (tree/map->IndexNode (nippy/thaw-from-in! data-input)))
 
-             (nippy/extend-freeze hitchhiker.tree.DataNode :b-tree/data-node
-                                  [node data-output]
-                                  (nippy/freeze-to-out! data-output (into {} (encode node))))
+              (nippy/extend-freeze hitchhiker.tree.DataNode :b-tree/data-node
+                                   [node data-output]
+                                   (nippy/freeze-to-out! data-output (into {} (encode node))))
 
-             (nippy/extend-thaw :b-tree/data-node
-                                [data-input]
-                                (tree/map->DataNode (nippy/thaw-from-in! data-input)))])))
+              (nippy/extend-thaw :b-tree/data-node
+                                 [data-input]
+                                 (tree/map->DataNode (nippy/thaw-from-in! data-input)))])))
 
 (defn ensure-installed!
   []

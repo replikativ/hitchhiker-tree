@@ -1,25 +1,28 @@
 {:paths ["src"]
- :deps {org.clojure/clojure         {:mvn/version "1.10.1"}
-        org.clojure/clojurescript   {:mvn/version "1.10.773"}
-        org.clojure/core.rrb-vector {:mvn/version "0.1.1"}
-        org.clojure/core.cache      {:mvn/version "1.0.207"}
-        com.taoensso/carmine        {:mvn/version "2.20.0"}
-        io.replikativ/konserve      {:mvn/version "0.5.1"}
-        org.clojure/core.memoize    {:mvn/version "1.0.236"}}
- :aliases {:cljs {:extra-deps {thheller/shadow-cljs  {:mvn/version "2.10.21"}
-                               binaryage/devtools    {:mvn/version "1.0.2"}}
+ :deps {org.clojure/clojure {:mvn/version "1.11.1"}
+        org.clojure/clojurescript {:mvn/version "1.11.60"}
+        org.clojure/core.rrb-vector {:mvn/version "0.1.2"}
+        org.clojure/core.cache {:mvn/version "1.0.225"}
+        com.taoensso/carmine {:mvn/version "3.1.0"}
+        io.replikativ/konserve {:mvn/version "0.7.271"}
+        org.clojure/core.memoize {:mvn/version "1.0.257"}}
+ :aliases {:cljs {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.1"}
+                               binaryage/devtools {:mvn/version "1.0.6"}}
                   :extra-paths ["test"]}
-           :dev  {:extra-deps {criterium/criterium  {:mvn/version "0.4.4"}
-                               cider/cider-nrepl    {:mvn/version "0.19.0"}
-                               nrepl/nrepl          {:mvn/version "0.5.3"}}}
-           :test {:extra-deps {lambdaisland/kaocha           {:mvn/version "1.0.641"}
-                               org.clojure/test.check        {:mvn/version "0.9.0"}
-                               io.replikativ/hitchhiker-tree {:local/root "."}
-                               io.replikativ/datahike        {:mvn/version "0.3.4-SNAPSHOT"}}
+           :dev {:extra-deps {criterium/criterium {:mvn/version "0.4.6"}
+                              cider/cider-nrepl {:mvn/version "0.28.5"}
+                              nrepl/nrepl {:mvn/version "1.0.0"}}}
+           :test {:extra-deps {lambdaisland/kaocha {:mvn/version "1.69.1069"}
+                               org.clojure/test.check {:mvn/version "1.1.1"}
+                               io.replikativ/hitchhiker-tree {:local/root "."}}
                   :extra-paths ["test"]}
-           :jar {:extra-deps {seancorfield/depstar {:mvn/version "1.1.116"}}
-                 :main-opts ["-m" "hf.depstar.jar" "replikativ-hitchhiker-tree.jar"]}
-           :deploy {:extra-deps {deps-deploy/deps-deploy {:mvn/version "0.0.9"}}
-                    :main-opts ["-m" "deps-deploy.deps-deploy" "deploy" "replikativ-hitchhiker-tree.jar"]}
-           :format {:extra-deps {cljfmt/cljfmt {:mvn/version "0.7.0"}}
-                    :main-opts ["-m" "cljfmt.main" "check"]}}}
+           :build {:deps {io.github.seancorfield/build-clj {:git/tag "v0.6.7"
+                                                            :git/sha "22c2d09"}
+                          borkdude/gh-release-artifact {:git/url "https://github.com/borkdude/gh-release-artifact"
+                                                        :sha "a83ee8da47d56a80b6380cbb6b4b9274048067bd"}
+                          babashka/babashka.curl {:mvn/version "0.1.1"}
+                          babashka/fs {:mvn/version "0.1.2"}
+                          cheshire/cheshire {:mvn/version "5.10.2"}}
+                   :ns-default build}
+           :ffix {:extra-deps {cljfmt/cljfmt {:mvn/version "0.9.0"}}
+                  :main-opts ["-m" "cljfmt.main" "fix"]}}}

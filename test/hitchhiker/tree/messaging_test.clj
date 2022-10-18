@@ -10,9 +10,11 @@
    [hitchhiker.tree.op :as op]
    [hitchhiker.tree.messaging :as msg]))
 
+(def ops-counter (atom 0))
+
 (defn insert
   [t k]
-  (ha/<?? (msg/insert t k k 0)))
+  (ha/<?? (msg/insert t k k (swap! ops-counter inc))))
 
 (defn lookup-fwd-iter
   [t v]
@@ -70,7 +72,7 @@
                 (let [set-a (sort the-set)
                       set-b (take num the-set)
                       b-tree (reduce insert (ha/<?? (tree/b-tree (tree/->Config 3 3 2))) set-a)
-                      b-tree-without (reduce #(ha/<?? (msg/delete %1 %2 0)) b-tree set-b)
+                      b-tree-without (reduce #(ha/<?? (msg/delete %1 %2 (swap! ops-counter inc))) b-tree set-b)
                       b-tree-order (lookup-fwd-iter b-tree-without Integer/MIN_VALUE)]
                   (= (seq (remove (set set-b) set-a)) b-tree-order))))
 
@@ -146,7 +148,7 @@
                                                (case op
                                                  :add [(insert t x-reduced)
                                                        (conj s x-reduced)]
-                                                 :del [(ha/<?? (msg/delete t x-reduced 0))
+                                                 :del [(ha/<?? (msg/delete t x-reduced (swap! ops-counter inc)))
                                                        (disj s x-reduced)])))
                                            [(ha/<?? (tree/b-tree (tree/->Config 3 3 2))) #{}]
                                            ops)]
