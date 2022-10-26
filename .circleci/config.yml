@@ -32,6 +32,7 @@ workflows:
             branches:
               only: main
           requires:
+            - tools/format
             - tools/unittest
             - tools/integrationtest
             - tools/build
