@@ -25,31 +25,23 @@ workflows:
           context: dockerhub-deploy
           requires:
             - tools/setup
-      - tools/deploy-snapshot:
-          jarname: "hitchhiker-tree"
+      - tools/deploy:
           context:
-            - clojars-deploy
             - dockerhub-deploy
           filters:
             branches:
-              only: development
+              only: main
           requires:
-            - tools/setup
             - tools/format
             - tools/unittest
             - tools/integrationtest
             - tools/build
-      - tools/deploy-release:
-          jarname: "hitchhiker-tree"
+      - tools/release:
           context:
-            - clojars-deploy
             - dockerhub-deploy
+            - github-token
           filters:
             branches:
-              only: master
+              only: main
           requires:
-            - tools/setup
-            - tools/format
-            - tools/unittest
-            - tools/integrationtest
-            - tools/build
+            - tools/deploy
