@@ -40,14 +40,13 @@ workflows:
           requires:
             - tools/setup
       - build:
-          context:
-            - dockerhub-deploy
-            - clojars-deploy
+          context: dockerhub-deploy
           requires:
             - tools/setup
       - tools/deploy:
           context:
             - dockerhub-deploy
+            - clojars-deploy
           filters:
             branches:
               only: main
