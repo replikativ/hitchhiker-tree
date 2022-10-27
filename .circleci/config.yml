@@ -40,7 +40,9 @@ workflows:
           requires:
             - tools/setup
       - build:
-          context: dockerhub-deploy
+          context:
+            - dockerhub-deploy
+            - clojars-deploy
           requires:
             - tools/setup
       - tools/deploy:
