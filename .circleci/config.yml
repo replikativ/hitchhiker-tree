@@ -3,6 +3,25 @@ version: 2.1
 orbs:
   tools: replikativ/clj-tools@0
 
+jobs:
+  build:
+    executor: tools/clojurecli
+    steps:
+      - attach_workspace:
+          at: /home/circleci
+      - run:
+          name: clean
+          command: clojure -T:build clean
+      - run:
+          name: jar
+          command: clojure -T:build jar
+      - persist_to_workspace:
+          root: /home/circleci/
+          paths:
+            - .m2
+            - .npm
+            - replikativ
+
 workflows:
   build-test-and-deploy:
     jobs:
@@ -20,8 +39,7 @@ workflows:
           context: dockerhub-deploy
           requires:
             - tools/setup
-      - tools/build:
-          jarname: "hitchhiker-tree"
+      - build:
           context: dockerhub-deploy
           requires:
             - tools/setup
@@ -35,7 +53,7 @@ workflows:
             - tools/format
             - tools/unittest
             - tools/integrationtest
-            - tools/build
+            - build
       - tools/release:
           context:
             - dockerhub-deploy
